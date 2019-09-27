@@ -1,0 +1,79 @@
+use byte_struct::*;
+use std::io::Cursor;
+// use byteorder::{LittleEndian, ReadBytesExt};
+// use bit_field::BitArray;
+
+bitfields!(
+    #[derive(PartialEq, Debug)]
+    // ieee754_half: u16 {
+    //     sign: 1,
+    //     exponent: 5,
+    //     fraction: 10,
+    // }
+
+    ieee754_half: u16 {
+        fraction: 10,
+        exponent: 5,
+        sign: 1,
+    }
+);
+
+// #[derive(ByteStruct, PartialEq, Debug)]
+// #[byte_struct_le]
+// struct IEEE754_Half {
+//     rep: ieee754_half,
+// }
+
+impl ieee754_half {
+    pub fn to_float(&self) {
+        match self.exponent {
+            0b00000 => {
+                if self.sign == 0b1 {
+                    print!("-");
+                }
+                println!(
+                    "{}",
+                    (2.0_f32).powf(14.0) * (0.0 + (self.fraction as f32 / 1024.0))
+                )
+                // (-1) self.rep.
+            }
+            0b11111 => {}
+            _ => {
+                // let exp = 0b00000000 | self.exponent;
+                // println!("Sign: {:b}", self.sign);
+                // println!("Exponent: {:b}", self.exponent);
+                // println!("Fraction: {:b}", self.fraction);
+                if self.sign == 0b1 {
+                    print!("-");
+                }
+                println!(
+                    "{}",
+                    (2.0_f32).powf(self.exponent as f32 - 15.0)
+                        * (1.0 + (self.fraction as f32 / 1024.0))
+                )
+                // (-1) self.rep.
+            }
+        }
+
+        println!("Sign: {:#b}", self.sign);
+        println!("Exponent: {:#b}", self.exponent);
+        println!("Fraction: {:#b}", self.fraction);
+        println!(
+            "Total: {:b} {:b} {:b}",
+            self.sign, self.exponent, self.fraction
+        );
+    }
+}
+
+fn main() {
+    let num: [u8; 2] = [0b0000_0100, 0b0000_0000];
+    // 0 11110 1111111111
+    // let num: u16 = 0b0001101011101001;
+    // let num2: u16 = 0b10001000_10000000;
+    // let rdr = Cursor::new(num);
+    println!("Bytes: {:?}", num);
+    let foo = ieee754_half::read_bytes_default_be(&num);
+    foo.to_float();
+    // foo.set_bits
+    println!("Hello, world! {:?}", foo);
+}
