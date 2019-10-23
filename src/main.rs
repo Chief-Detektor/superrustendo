@@ -39,8 +39,7 @@ fn main() -> std::io::Result<()> {
   // let mut f = File::open(Path::new("International Superstar Soccer Deluxe (U).smc")).unwrap();
   // f.read_to_end(&mut rom);
 
-  let card =
-    cartridge::Cardridge::load_rom(Path::new("International Superstar Soccer Deluxe (U).sfc"));
+  let card = cartridge::Cardridge::load_rom(Path::new("elix-nu-pal.sfc"));
 
   // println!("{:x} at {:x}", card.read_byte(0xffa0), 0xff0a);
 
@@ -48,34 +47,33 @@ fn main() -> std::io::Result<()> {
 
   let mut reset_vector = card.read_u16(0x7ffc) - 0x8000;
 
-  // println!("reset vector: {:x}", reset_vector);
+  println!("reset vector: {:x}", reset_vector);
 
-  decoder.read_instructions(&card.read_bytes(reset_vector as usize, 0x8000));
+  decoder.read_instructions(&card.read_bytes(reset_vector as usize, 0x00010));
 
-  /*
-  // BRK
-  println!("{:?}", decoder.decode(0x00));
+  decoder.printInstructions();
 
-  //ORA
-  println!("{:?}", decoder.decode(0x1));
+  // println!("{:?}", decoder);
 
-  // COP
-  println!("{:?}", decoder.decode(0x2));
+  // Test all opcodes
 
-  // ORA Stack Rel
-  println!("{:?}", decoder.decode(0x3));
+  // let mut unknown = 0;
+  // let mut found_instructions = Vec::new();
 
-  println!("{:?}", decoder.decode(0x4));
-  println!("{:?}", decoder.decode(0x5));
-  println!("{:?}", decoder.decode(0x6));
+  // for i in 0x00..=0xff {
+  //   //0xff {
+  //   if let Some(foo) = decoder.decode(i) {
+  //     println!("{:x}, is {:?}", i, foo);
+  //     found_instructions.push(foo.0);
+  //   } else {
+  //     println!("unkown: {:x}", i);
+  //     unknown += 1;
+  //   }
+  //   // println!("{:x}: {:?}", i, decoder.decode(i));
+  // }
 
-  println!("{:?}", decoder.decode(0xc));
-  println!("{:?}", decoder.decode(0xa));
-  println!("{:?}", decoder.decode(0xe));
-  println!("{:?}", decoder.decode(0x1e));
-  println!("{:?}", decoder.decode(0x16));
-
-  */
+  // println!("{:} unknown ops", unknown);
+  // println!("found: {:?}", found_instructions);
   // println!(
   //   "first instruction: {:x}",
   //   card.read_byte(reset_vector as usize)
