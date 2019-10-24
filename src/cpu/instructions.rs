@@ -1,41 +1,81 @@
 use super::constants::*;
+use super::Registers;
+use super::CPU;
+use byte_struct::*;
 
 #[derive(Debug, Clone)]
 pub enum AddressModes {
-  Unknown,
-  Immediate,
-  DirectPage,
   Absolute,
-  DirectPageIndexedX,
+  AbsoluteIndexedIndirect,
   AbsoluteIndexedX,
   AbsoluteIndexedY,
-  DirectPageIndexedIndirectX,
-  DirectPageIndexedIndirectY,
-  DirectPageIndirectLongIndexedY,
-  DirectPageIndirectLong,
+  AbsoluteIndirect,
   AbsoluteLong,
   AbsoluteLongIndexedX,
+  Accumulator,
+  BlockMove,
+  DirectPage,
+  DirectPageIndexedIndirectX,
+  DirectPageIndexedIndirectY,
+  DirectPageIndexedX,
+  DirectPageIndirect,
+  DirectPageIndirectLong,
+  DirectPageIndirectLongIndexedY,
+  Immediate,
+  Implied,
+  ProgrammCounterRelative,
+  ProgrammCounterRelativeLong,
+  StackAbsolute,
+  StackDirectPageIndirect,
+  StackInterrupt,
+  StackPCRelativeLong,
+  StackPull,
+  StackPush,
+  StackRTI,
+  StackRTL,
+  StackRTS,
   StackRelative,
   StackRelativeIndirectIndexedY,
-  DirectPageIndirect,
-  // Group II
-  Accumulator,
-  // Group III
-  StackInterrupt,
-  StackPush,
-  ProgrammCounterRelative,
-  Implied,
-  StackPull,
-  StackRTI,
-  BlockMove,
-  AbsoluteIndirect,
-  AbsoluteIndexedIndirect,
-  StackRTS,
-  StackPCRelativeLong,
-  StackRTL,
-  ProgrammCounterRelativeLong,
-  StackDirectPageIndirect,
-  StackAbsolute,
+  Unknown,
+}
+
+impl AddressModes {
+  pub fn len(&self) -> usize {
+    match self {
+      AddressModes::Absolute => 3,
+      AddressModes::AbsoluteIndexedIndirect => 3,
+      AddressModes::AbsoluteIndexedX => 3,
+      AddressModes::AbsoluteIndexedY => 3,
+      AddressModes::AbsoluteIndirect => 3,
+      AddressModes::AbsoluteLong => 4,
+      AddressModes::AbsoluteLongIndexedX => 4,
+      AddressModes::Accumulator => 1,
+      AddressModes::BlockMove => 3,
+      AddressModes::DirectPage => 2,
+      AddressModes::DirectPageIndexedIndirectX => 2,
+      AddressModes::DirectPageIndexedIndirectY => 2,
+      AddressModes::DirectPageIndexedX => 2,
+      AddressModes::DirectPageIndirect => 2,
+      AddressModes::DirectPageIndirectLong => 2,
+      AddressModes::DirectPageIndirectLongIndexedY => 2,
+      AddressModes::Immediate => 2,
+      AddressModes::Implied => 1,
+      AddressModes::ProgrammCounterRelative => 2,
+      AddressModes::ProgrammCounterRelativeLong => 3,
+      AddressModes::StackAbsolute => 3,
+      AddressModes::StackDirectPageIndirect => 2,
+      AddressModes::StackInterrupt => 2,
+      AddressModes::StackPCRelativeLong => 3,
+      AddressModes::StackPull => 1,
+      AddressModes::StackPush => 1,
+      AddressModes::StackRTI => 1,
+      AddressModes::StackRTL => 1,
+      AddressModes::StackRTS => 1,
+      AddressModes::StackRelative => 2,
+      AddressModes::StackRelativeIndirectIndexedY => 2,
+      AddressModes::Unknown => 2,
+    }
+  }
 }
 
 impl Default for AddressModes {
@@ -109,31 +149,59 @@ fn get_gi_addr_mode(opcode: u8) -> Option<(AddressModes, usize)> {
 
 #[derive(Debug, Default, Clone)]
 pub struct Operants {
-  operant_low: u8,
-  operant_high: u8,
-  operant_bank: u8,
+  // pub operant_low: u8,
+  // pub operant_high: u8,
+  // pub operant_bank: u8,
+  pub bytes: [u8; 4],
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct Instruction {
   address: u32,
   pub opcode: Opcodes,
-  address_mode: AddressModes,
+  pub address_mode: AddressModes,
   lenght: usize,
   pub operants: Operants,
   cycles: usize,
 }
 
-// impl Instruction {
-//   fn execute() {
-
-//   }
-// }
+impl Instruction {
+  fn execute(&mut self, cpu: &mut CPU) {
+    match &self.opcode {
+      Opcodes::SEI => {
+        println!("SEI!");
+        cpu.regs.P.i = 1;
+      }
+      Opcodes::CLC => {
+        cpu.regs.P.c = 0;
+      }
+      Opcodes::REP => {
+        println!("REP{:?}", cpu.regs.P);
+        if cpu.regs.P.c == 0 {
+          // cpu.regs.P.write_bytes_default_le(&mut [0xff]);
+          // Registers::read_bytes(self.operants.bytes[0])
+          //cpu.regs.P & !self.operants.bytes[0]
+          println!("REP1: {:?}", cpu.regs.P);
+        } else {
+          println!("Rep2: {:?}", cpu.regs.P);
+        }
+        // cpu.regs.p =
+      }
+      Opcodes::LDX => {
+        if cpu.regs.P.x == 0 {
+          self.lenght += 1;
+          // println!("LDX!!!!!!!! {:?}", self);
+        }
+      }
+      _ => {}
+    }
+  }
+}
 
 #[derive(Debug, Clone)]
 pub enum Opcodes {
-  // Group I Opcodes
   Unknown,
+  // Group I Opcodes
   ADC,
   AND,
   CMP,
@@ -233,7 +301,7 @@ impl Default for Opcodes {
   }
 }
 
-pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
+pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   // println!("Decode group III: {:X}, {:b}", opcode, G3_OP_TSB);
   // println!(
   //   "G III {:b}, {:b}, {:x}",
@@ -244,57 +312,57 @@ pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
 
   match opcode | G3_OP_TSB {
     G3_OP_TSB => match opcode {
-      0xc => return Some((Opcodes::TSB, AddressModes::Absolute, 3)),
-      0x4 => return Some((Opcodes::TSB, AddressModes::DirectPage, 2)),
+      0xc => return Some((Opcodes::TSB, AddressModes::Absolute)),
+      0x4 => return Some((Opcodes::TSB, AddressModes::DirectPage)),
       _ => {}
     },
     _ => {}
   }
   match opcode | G3_OP_TRB {
     G3_OP_TRB => match opcode {
-      0x1c => return Some((Opcodes::TRB, AddressModes::Absolute, 3)),
-      0x14 => return Some((Opcodes::TRB, AddressModes::DirectPage, 2)),
+      0x1c => return Some((Opcodes::TRB, AddressModes::Absolute)),
+      0x14 => return Some((Opcodes::TRB, AddressModes::DirectPage)),
       _ => {}
     },
     _ => {}
   }
   match opcode | G3_OP_JSR {
     G3_OP_JSR => match opcode {
-      0x20 => return Some((Opcodes::JSR, AddressModes::Absolute, 3)),
-      0xfc => return Some((Opcodes::JSR, AddressModes::AbsoluteIndexedIndirect, 3)),
-      0x22 => return Some((Opcodes::JSR, AddressModes::AbsoluteLong, 4)),
+      0x20 => return Some((Opcodes::JSR, AddressModes::Absolute)),
+      0xfc => return Some((Opcodes::JSR, AddressModes::AbsoluteIndexedIndirect)),
+      0x22 => return Some((Opcodes::JSR, AddressModes::AbsoluteLong)),
       _ => {}
     },
     _ => {}
   }
   match opcode | G3_OP_BIT {
     G3_OP_BIT => match opcode {
-      0x24 => return Some((Opcodes::BIT, AddressModes::DirectPage, 3)),
-      0x2c => return Some((Opcodes::BIT, AddressModes::Absolute, 3)),
-      0x34 => return Some((Opcodes::BIT, AddressModes::DirectPageIndexedX, 2)),
-      0x3c => return Some((Opcodes::BIT, AddressModes::AbsoluteIndexedX, 3)),
-      0x89 => return Some((Opcodes::BIT, AddressModes::Immediate, 2)), // bytes length can be 3 if m = 0 (16 bit accumulator)
+      0x24 => return Some((Opcodes::BIT, AddressModes::DirectPage)),
+      0x2c => return Some((Opcodes::BIT, AddressModes::Absolute)),
+      0x34 => return Some((Opcodes::BIT, AddressModes::DirectPageIndexedX)),
+      0x3c => return Some((Opcodes::BIT, AddressModes::AbsoluteIndexedX)),
+      0x89 => return Some((Opcodes::BIT, AddressModes::Immediate)), // bytes length can be 3 if m = 0 (16 bit accumulator)
       _ => {}
     },
     _ => {}
   }
   match opcode | G3_OP_JMP {
     G3_OP_JMP => match opcode {
-      0x4c => return Some((Opcodes::JMP, AddressModes::Absolute, 3)),
-      0x5c => return Some((Opcodes::JMP, AddressModes::AbsoluteLong, 4)),
-      0x6c => return Some((Opcodes::JMP, AddressModes::AbsoluteIndirect, 3)),
-      0x7c => return Some((Opcodes::JMP, AddressModes::AbsoluteIndexedIndirect, 3)),
-      0xdc => return Some((Opcodes::JMP, AddressModes::Immediate, 2)), // bytes length can be 3 if m = 0 (16 bit accumulator)
+      0x4c => return Some((Opcodes::JMP, AddressModes::Absolute)),
+      0x5c => return Some((Opcodes::JMP, AddressModes::AbsoluteLong)),
+      0x6c => return Some((Opcodes::JMP, AddressModes::AbsoluteIndirect)),
+      0x7c => return Some((Opcodes::JMP, AddressModes::AbsoluteIndexedIndirect)),
+      0xdc => return Some((Opcodes::JMP, AddressModes::Immediate)), // bytes length can be 3 if m = 0 (16 bit accumulator)
       _ => {}
     },
     _ => {}
   }
   match opcode | G3_OP_STZ {
     G3_OP_STZ => match opcode {
-      0x64 => return Some((Opcodes::STZ, AddressModes::DirectPage, 2)),
-      0x74 => return Some((Opcodes::STZ, AddressModes::DirectPageIndexedIndirectX, 2)), // TODO: check address modes
-      0x9c => return Some((Opcodes::STZ, AddressModes::Absolute, 3)),
-      0x9e => return Some((Opcodes::STZ, AddressModes::AbsoluteIndexedIndirect, 3)),
+      0x64 => return Some((Opcodes::STZ, AddressModes::DirectPage)),
+      0x74 => return Some((Opcodes::STZ, AddressModes::DirectPageIndexedIndirectX)), // TODO: check address modes
+      0x9c => return Some((Opcodes::STZ, AddressModes::Absolute)),
+      0x9e => return Some((Opcodes::STZ, AddressModes::AbsoluteIndexedIndirect)),
       _ => {}
     },
     _ => {}
@@ -302,9 +370,9 @@ pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
 
   match opcode | G3_OP_CPY {
     G3_OP_CPY => match opcode {
-      0xc0 => return Some((Opcodes::CPY, AddressModes::Immediate, 2)),
-      0xc4 => return Some((Opcodes::CPY, AddressModes::DirectPage, 2)),
-      0xcc => return Some((Opcodes::CPY, AddressModes::Absolute, 3)),
+      0xc0 => return Some((Opcodes::CPY, AddressModes::Immediate)),
+      0xc4 => return Some((Opcodes::CPY, AddressModes::DirectPage)),
+      0xcc => return Some((Opcodes::CPY, AddressModes::Absolute)),
       _ => {}
     },
     _ => {}
@@ -312,83 +380,83 @@ pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
 
   match opcode | G3_OP_CPX {
     G3_OP_CPX => match opcode {
-      0xe0 => return Some((Opcodes::CPX, AddressModes::Immediate, 2)),
-      0xe4 => return Some((Opcodes::CPX, AddressModes::DirectPage, 2)),
-      0xec => return Some((Opcodes::CPX, AddressModes::Absolute, 3)),
+      0xe0 => return Some((Opcodes::CPX, AddressModes::Immediate)),
+      0xe4 => return Some((Opcodes::CPX, AddressModes::DirectPage)),
+      0xec => return Some((Opcodes::CPX, AddressModes::Absolute)),
       _ => {}
     },
     _ => {}
   }
   match opcode {
-    G3_OP_BRK => Some((Opcodes::BRK, AddressModes::StackInterrupt, 2)),
-    G3_OP_COP => Some((Opcodes::COP, AddressModes::StackInterrupt, 2)),
-    G3_OP_PHP => Some((Opcodes::PHP, AddressModes::StackPush, 1)),
-    G3_OP_PHD => Some((Opcodes::PHD, AddressModes::StackPush, 1)),
-    G3_OP_BLP => Some((Opcodes::BLP, AddressModes::ProgrammCounterRelative, 2)),
-    G3_OP_CLC => Some((Opcodes::CLC, AddressModes::Implied, 1)),
-    G3_OP_TCS => Some((Opcodes::TCS, AddressModes::Implied, 1)),
-    G3_OP_PLP => Some((Opcodes::PLP, AddressModes::StackPull, 1)),
-    G3_OP_PLD => Some((Opcodes::PLD, AddressModes::StackPull, 1)),
-    G3_OP_BMI => Some((Opcodes::BMI, AddressModes::ProgrammCounterRelative, 2)),
-    G3_OP_SEC => Some((Opcodes::SEC, AddressModes::Implied, 1)),
-    G3_OP_TSC => Some((Opcodes::TSC, AddressModes::Implied, 1)),
-    G3_OP_RTI => Some((Opcodes::RTI, AddressModes::StackRTI, 1)),
-    G3_OP_WDM => Some((Opcodes::WDM, AddressModes::Unknown, 1)),
-    G3_OP_MVP => Some((Opcodes::MVP, AddressModes::BlockMove, 3)),
-    G3_OP_PHA => Some((Opcodes::PHA, AddressModes::StackPush, 1)),
-    G3_OP_PHK => Some((Opcodes::PHK, AddressModes::StackPush, 1)),
-    G3_OP_BVC => Some((Opcodes::BVC, AddressModes::ProgrammCounterRelative, 2)),
-    G3_OP_MVN => Some((Opcodes::MVN, AddressModes::BlockMove, 3)),
-    G3_OP_CLI => Some((Opcodes::CLI, AddressModes::Implied, 1)),
-    G3_OP_PHY => Some((Opcodes::PHY, AddressModes::StackPush, 1)),
-    G3_OP_TCD => Some((Opcodes::TCD, AddressModes::Implied, 1)),
-    G3_OP_RTS => Some((Opcodes::RTS, AddressModes::StackRTS, 1)),
-    G3_OP_PER => Some((Opcodes::PER, AddressModes::StackPCRelativeLong, 3)),
-    G3_OP_PLA => Some((Opcodes::PLA, AddressModes::StackPull, 1)),
-    G3_OP_RTL => Some((Opcodes::RTL, AddressModes::StackRTL, 1)),
-    G3_OP_BVS => Some((Opcodes::BVS, AddressModes::ProgrammCounterRelative, 2)),
-    G3_OP_SEI => Some((Opcodes::SEI, AddressModes::Implied, 1)),
-    G3_OP_PLY => Some((Opcodes::PLY, AddressModes::StackPull, 1)),
-    G3_OP_TDC => Some((Opcodes::TDC, AddressModes::Implied, 1)),
-    G3_OP_BRA => Some((Opcodes::BRA, AddressModes::ProgrammCounterRelative, 2)),
-    G3_OP_BRL => Some((Opcodes::BRL, AddressModes::ProgrammCounterRelativeLong, 3)),
-    G3_OP_DEY => Some((Opcodes::DEY, AddressModes::Implied, 1)),
-    G3_OP_TXA => Some((Opcodes::TXA, AddressModes::Implied, 1)),
-    G3_OP_PHB => Some((Opcodes::PHB, AddressModes::StackPush, 1)),
-    G3_OP_BCC => Some((Opcodes::BCC, AddressModes::ProgrammCounterRelative, 2)),
-    G3_OP_TYA => Some((Opcodes::TYA, AddressModes::Implied, 1)),
-    G3_OP_TXS => Some((Opcodes::TXS, AddressModes::Implied, 1)),
-    G3_OP_TXY => Some((Opcodes::TXY, AddressModes::Implied, 1)),
-    G3_OP_TAY => Some((Opcodes::TAY, AddressModes::Implied, 1)),
-    G3_OP_TAX => Some((Opcodes::TAX, AddressModes::Implied, 1)),
-    G3_OP_PLB => Some((Opcodes::PLB, AddressModes::StackPull, 1)),
-    G3_OP_BCS => Some((Opcodes::BCS, AddressModes::ProgrammCounterRelative, 2)),
-    G3_OP_CLV => Some((Opcodes::CLV, AddressModes::Implied, 1)),
-    G3_OP_TSX => Some((Opcodes::TSX, AddressModes::Implied, 1)),
-    G3_OP_TYX => Some((Opcodes::TYX, AddressModes::Implied, 1)),
-    G3_OP_REP => Some((Opcodes::REP, AddressModes::Immediate, 2)),
-    G3_OP_INY => Some((Opcodes::INY, AddressModes::Implied, 1)),
-    G3_OP_DEX => Some((Opcodes::DEX, AddressModes::Implied, 1)),
-    G3_OP_WAI => Some((Opcodes::WAI, AddressModes::Implied, 1)),
-    G3_OP_BNE => Some((Opcodes::BNE, AddressModes::ProgrammCounterRelative, 2)),
-    G3_OP_PEI => Some((Opcodes::PEI, AddressModes::StackDirectPageIndirect, 2)),
-    G3_OP_CLD => Some((Opcodes::CLD, AddressModes::Implied, 1)),
-    G3_OP_PHX => Some((Opcodes::PHX, AddressModes::StackPush, 1)),
-    G3_OP_STP => Some((Opcodes::STP, AddressModes::Implied, 1)),
-    G3_OP_INX => Some((Opcodes::INX, AddressModes::Implied, 1)),
-    G3_OP_NOP => Some((Opcodes::NOP, AddressModes::Implied, 1)),
-    G3_OP_XBA => Some((Opcodes::XBA, AddressModes::Implied, 1)),
-    G3_OP_BEQ => Some((Opcodes::BEQ, AddressModes::ProgrammCounterRelative, 2)),
-    G3_OP_PEA => Some((Opcodes::PEA, AddressModes::StackAbsolute, 3)),
-    G3_OP_SED => Some((Opcodes::SED, AddressModes::Implied, 1)),
-    G3_OP_PLX => Some((Opcodes::PLX, AddressModes::StackPull, 1)),
-    G3_OP_XCE => Some((Opcodes::XCE, AddressModes::Implied, 1)),
+    G3_OP_BRK => Some((Opcodes::BRK, AddressModes::StackInterrupt)),
+    G3_OP_COP => Some((Opcodes::COP, AddressModes::StackInterrupt)),
+    G3_OP_PHP => Some((Opcodes::PHP, AddressModes::StackPush)),
+    G3_OP_PHD => Some((Opcodes::PHD, AddressModes::StackPush)),
+    G3_OP_BLP => Some((Opcodes::BLP, AddressModes::ProgrammCounterRelative)),
+    G3_OP_CLC => Some((Opcodes::CLC, AddressModes::Implied)),
+    G3_OP_TCS => Some((Opcodes::TCS, AddressModes::Implied)),
+    G3_OP_PLP => Some((Opcodes::PLP, AddressModes::StackPull)),
+    G3_OP_PLD => Some((Opcodes::PLD, AddressModes::StackPull)),
+    G3_OP_BMI => Some((Opcodes::BMI, AddressModes::ProgrammCounterRelative)),
+    G3_OP_SEC => Some((Opcodes::SEC, AddressModes::Implied)),
+    G3_OP_TSC => Some((Opcodes::TSC, AddressModes::Implied)),
+    G3_OP_RTI => Some((Opcodes::RTI, AddressModes::StackRTI)),
+    G3_OP_WDM => Some((Opcodes::WDM, AddressModes::Unknown)),
+    G3_OP_MVP => Some((Opcodes::MVP, AddressModes::BlockMove)),
+    G3_OP_PHA => Some((Opcodes::PHA, AddressModes::StackPush)),
+    G3_OP_PHK => Some((Opcodes::PHK, AddressModes::StackPush)),
+    G3_OP_BVC => Some((Opcodes::BVC, AddressModes::ProgrammCounterRelative)),
+    G3_OP_MVN => Some((Opcodes::MVN, AddressModes::BlockMove)),
+    G3_OP_CLI => Some((Opcodes::CLI, AddressModes::Implied)),
+    G3_OP_PHY => Some((Opcodes::PHY, AddressModes::StackPush)),
+    G3_OP_TCD => Some((Opcodes::TCD, AddressModes::Implied)),
+    G3_OP_RTS => Some((Opcodes::RTS, AddressModes::StackRTS)),
+    G3_OP_PER => Some((Opcodes::PER, AddressModes::StackPCRelativeLong)),
+    G3_OP_PLA => Some((Opcodes::PLA, AddressModes::StackPull)),
+    G3_OP_RTL => Some((Opcodes::RTL, AddressModes::StackRTL)),
+    G3_OP_BVS => Some((Opcodes::BVS, AddressModes::ProgrammCounterRelative)),
+    G3_OP_SEI => Some((Opcodes::SEI, AddressModes::Implied)),
+    G3_OP_PLY => Some((Opcodes::PLY, AddressModes::StackPull)),
+    G3_OP_TDC => Some((Opcodes::TDC, AddressModes::Implied)),
+    G3_OP_BRA => Some((Opcodes::BRA, AddressModes::ProgrammCounterRelative)),
+    G3_OP_BRL => Some((Opcodes::BRL, AddressModes::ProgrammCounterRelativeLong)),
+    G3_OP_DEY => Some((Opcodes::DEY, AddressModes::Implied)),
+    G3_OP_TXA => Some((Opcodes::TXA, AddressModes::Implied)),
+    G3_OP_PHB => Some((Opcodes::PHB, AddressModes::StackPush)),
+    G3_OP_BCC => Some((Opcodes::BCC, AddressModes::ProgrammCounterRelative)),
+    G3_OP_TYA => Some((Opcodes::TYA, AddressModes::Implied)),
+    G3_OP_TXS => Some((Opcodes::TXS, AddressModes::Implied)),
+    G3_OP_TXY => Some((Opcodes::TXY, AddressModes::Implied)),
+    G3_OP_TAY => Some((Opcodes::TAY, AddressModes::Implied)),
+    G3_OP_TAX => Some((Opcodes::TAX, AddressModes::Implied)),
+    G3_OP_PLB => Some((Opcodes::PLB, AddressModes::StackPull)),
+    G3_OP_BCS => Some((Opcodes::BCS, AddressModes::ProgrammCounterRelative)),
+    G3_OP_CLV => Some((Opcodes::CLV, AddressModes::Implied)),
+    G3_OP_TSX => Some((Opcodes::TSX, AddressModes::Implied)),
+    G3_OP_TYX => Some((Opcodes::TYX, AddressModes::Implied)),
+    G3_OP_REP => Some((Opcodes::REP, AddressModes::Immediate)),
+    G3_OP_INY => Some((Opcodes::INY, AddressModes::Implied)),
+    G3_OP_DEX => Some((Opcodes::DEX, AddressModes::Implied)),
+    G3_OP_WAI => Some((Opcodes::WAI, AddressModes::Implied)),
+    G3_OP_BNE => Some((Opcodes::BNE, AddressModes::ProgrammCounterRelative)),
+    G3_OP_PEI => Some((Opcodes::PEI, AddressModes::StackDirectPageIndirect)),
+    G3_OP_CLD => Some((Opcodes::CLD, AddressModes::Implied)),
+    G3_OP_PHX => Some((Opcodes::PHX, AddressModes::StackPush)),
+    G3_OP_STP => Some((Opcodes::STP, AddressModes::Implied)),
+    G3_OP_INX => Some((Opcodes::INX, AddressModes::Implied)),
+    G3_OP_NOP => Some((Opcodes::NOP, AddressModes::Implied)),
+    G3_OP_XBA => Some((Opcodes::XBA, AddressModes::Implied)),
+    G3_OP_BEQ => Some((Opcodes::BEQ, AddressModes::ProgrammCounterRelative)),
+    G3_OP_PEA => Some((Opcodes::PEA, AddressModes::StackAbsolute)),
+    G3_OP_SED => Some((Opcodes::SED, AddressModes::Implied)),
+    G3_OP_PLX => Some((Opcodes::PLX, AddressModes::StackPull)),
+    G3_OP_XCE => Some((Opcodes::XCE, AddressModes::Implied)),
     _ => None,
   }
   // Some((Opcodes::BRK, AddressModes::StackInterrupt, 2))
 }
 
-pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
+pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   // let group_2_mask: u8 = !GII_MASK;
   // let group_2_mask4addr_mode: u8 = !GII_MASK_4_ADDR_MODES;
   let g2_mask = opcode & !GII_MASK;
@@ -408,13 +476,13 @@ pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
   // Edge Cases...
   match opcode {
     0x1a => {
-      return Some((Opcodes::INC, AddressModes::Accumulator, 1));
+      return Some((Opcodes::INC, AddressModes::Accumulator));
     }
     0x3a => {
-      return Some((Opcodes::DEC, AddressModes::Accumulator, 1));
+      return Some((Opcodes::DEC, AddressModes::Accumulator));
     }
     0xe2 => {
-      return Some((Opcodes::CPX, AddressModes::Immediate, 2)); // Only on 65816...
+      return Some((Opcodes::CPX, AddressModes::Immediate)); // Only on 65816...
     }
     _ => {}
   }
@@ -423,28 +491,28 @@ pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
     G2_OP_DEC => {
       // println!("Test for DEC {:b}", opcode);
       if let Some(address_mode) = get_gii_addr_mode(opcode) {
-        return Some((Opcodes::DEC, address_mode.0, address_mode.1));
+        return Some((Opcodes::DEC, address_mode.0));
       } else {
         return None;
       }
     }
     G2_OP_INC => {
       if let Some(addr_mode) = get_gii_addr_mode(opcode) {
-        return Some((Opcodes::INC, addr_mode.0, addr_mode.1));
+        return Some((Opcodes::INC, addr_mode.0));
       } else {
         return None;
       }
     }
     G2_OP_STX => {
       if let Some(address_mode) = get_gii_addr_mode(opcode) {
-        return Some((Opcodes::STX, address_mode.0, address_mode.1));
+        return Some((Opcodes::STX, address_mode.0));
       } else {
         return None;
       }
     }
     G2_OP_STY => {
       if let Some(address_mode) = get_gii_addr_mode(opcode) {
-        return Some((Opcodes::STY, address_mode.0, address_mode.1));
+        return Some((Opcodes::STY, address_mode.0));
       } else {
         return None;
       }
@@ -455,28 +523,28 @@ pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
   match g2_mask {
     G2_OP_ASL => {
       if let Some(addr_mode) = get_gii_addr_mode(opcode) {
-        Some((Opcodes::ASL, addr_mode.0, addr_mode.1))
+        Some((Opcodes::ASL, addr_mode.0))
       } else {
         None
       }
     }
     G2_OP_LSR => {
       if let Some(addr_mode) = get_gii_addr_mode(opcode) {
-        Some((Opcodes::LSR, addr_mode.0, addr_mode.1))
+        Some((Opcodes::LSR, addr_mode.0))
       } else {
         None
       }
     }
     G2_OP_ROL => {
       if let Some(addr_mode) = get_gii_addr_mode(opcode) {
-        Some((Opcodes::ROL, addr_mode.0, addr_mode.1))
+        Some((Opcodes::ROL, addr_mode.0))
       } else {
         None
       }
     }
     G2_OP_ROR => {
       if let Some(address_mode) = get_gii_addr_mode(opcode) {
-        Some((Opcodes::ROR, address_mode.0, address_mode.1))
+        Some((Opcodes::ROR, address_mode.0))
       } else {
         None
       }
@@ -484,14 +552,14 @@ pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
     // Diffrend addressing here
     G2_OP_LDX => {
       if let Some(address_mode) = get_gii_reg_load_addr_mode(opcode) {
-        Some((Opcodes::LDX, address_mode.0, address_mode.1))
+        Some((Opcodes::LDX, address_mode.0))
       } else {
         None
       }
     }
     G2_OP_LDY => {
       if let Some(address_mode) = get_gii_reg_load_addr_mode(opcode) {
-        Some((Opcodes::LDY, address_mode.0, address_mode.1))
+        Some((Opcodes::LDY, address_mode.0))
       } else {
         None
       }
@@ -500,7 +568,7 @@ pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
   }
 }
 
-pub fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
+pub fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   let group_1_mask: u8 = !GI_MASK;
   let g1_mask = opcode & group_1_mask;
 
@@ -508,56 +576,56 @@ pub fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
   match g1_mask {
     G1_OP_ADC => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::ADC, addr_mode.0, addr_mode.1))
+        Some((Opcodes::ADC, addr_mode.0))
       } else {
         None
       }
     }
     G1_OP_AND => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::AND, addr_mode.0, addr_mode.1))
+        Some((Opcodes::AND, addr_mode.0))
       } else {
         None
       }
     }
     G1_OP_CMP => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::CMP, addr_mode.0, addr_mode.1))
+        Some((Opcodes::CMP, addr_mode.0))
       } else {
         None
       }
     }
     G1_OP_EOR => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::EOR, addr_mode.0, addr_mode.1))
+        Some((Opcodes::EOR, addr_mode.0))
       } else {
         None
       }
     }
     G1_OP_LDA => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::LDA, addr_mode.0, addr_mode.1))
+        Some((Opcodes::LDA, addr_mode.0))
       } else {
         None
       }
     }
     G1_OP_ORA => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::ORA, addr_mode.0, addr_mode.1))
+        Some((Opcodes::ORA, addr_mode.0))
       } else {
         None
       }
     }
     G1_OP_SBC => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::SBC, addr_mode.0, addr_mode.1))
+        Some((Opcodes::SBC, addr_mode.0))
       } else {
         None
       }
     }
     G1_OP_STA => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::STA, addr_mode.0, addr_mode.1))
+        Some((Opcodes::STA, addr_mode.0))
       } else {
         None
       }
@@ -584,94 +652,98 @@ impl Decoder {
   }
 
   // fn read_instruction(byte: u8)
-
-  pub fn read_instructions(&mut self, bytes: &Vec<u8>) /*-> Instruction*/
+  // TODO: Offset in instruction address
+  pub fn read_instructions(&mut self, mut cpu: &mut CPU, bytes: &Vec<u8>) /*-> Instruction*/
   {
     let mut bytes_to_read = 0;
-    let mut inst = Instruction::default();
-
+    // let mut address = 0;
     for (i, byte) in bytes.iter().enumerate() {
-      println!("{:x}", *byte);
-      if let Some(i) = self.decode(*byte) {
-        println!("{:?}", i);
+      let mut inst = Instruction::default();
+      if !self.fetching_instruction {
+        if let Ok(ins) = self.decode(*byte) {
+          print!("{:x} ", *byte);
+          self.fetching_instruction = true;
+          inst.address = i as _;
+          inst.opcode = ins.0;
+          inst.address_mode = ins.1; // println!("{:?}", i);
+          inst.lenght = inst.address_mode.len();
+          inst.execute(&mut cpu);
+          bytes_to_read = inst.lenght;
+          if bytes_to_read == 1 {
+            self.fetching_instruction = false;
+          // println!("{:?}", inst);
+          } else {
+            // inst.operants = Some(Operants::default());
+          }
+
+          // println!("{:?}", inst);
+          self.instructions.push(inst);
+          bytes_to_read -= 1;
+        }
+      } else {
+        let pos = self.instructions.len() - 1;
+        // println!("Pos: {:}", pos);
+        let mut ins = self.instructions.get_mut(pos).unwrap();
+        // ins.execute(&mut cpu);
+        match bytes_to_read {
+          // 4 => {
+          //   ins.operants.bytes[3] = *byte;
+          //   bytes_to_read -= 1;
+          // }
+          3 => {
+            ins.operants.bytes[2] = *byte;
+            bytes_to_read -= 1;
+          }
+          2 => {
+            ins.operants.bytes[1] = *byte;
+            bytes_to_read -= 1;
+          }
+          1 => {
+            ins.operants.bytes[0] = *byte;
+            bytes_to_read -= 1;
+            self.fetching_instruction = false;
+
+            // ins.execute(&mut cpu);
+          }
+          _ => {}
+        }
+        // Execute command to change cpu state
+        // println!("{:?}", ins);
+
+        // println!("Bytes to read: {}", bytes_to_read);
+        // println!(
+        //   "Payload {:x}, {:?}",
+        //   *byte,
+        //   self.instructions[self.instructions.len() - 1]
+        // );
+        // println!("");
       }
     }
-    // for (i, byte) in bytes.iter().enumerate() {
-    //   // let mut operants = Operants::default();
-    //   // TODO: reduce code dublication!<
-    //   // TODO: Fix this loop... it's crap
-    //   if !self.fetching_instruction {
-    //     if let Some(foo) = decode_group_III(*byte) {
-    //       self.fetching_instruction = true;
-    //       bytes_to_read = foo.2 - 1;
-    //       // println!("Addr: {:x},{:?}, {:?}, {:}", i, foo.0, foo.1, foo.2);
-    //       println!("{:?}", foo);
-    //       inst.address = i as u32;
-    //       inst.address_mode = foo.1;
-    //       inst.opcode = foo.0;
-    //       inst.lenght = foo.2;
-    //     // inst.cycles = foo;
-    //     } else if let Some(foo) = decode_group_II(*byte) {
-    //       self.fetching_instruction = true;
-    //       bytes_to_read = foo.2 - 1;
-    //       // println!("Addr: {:x},{:?}, {:?}, {:}", i, foo.0, foo.1, foo.2);
-    //       println!("{:?}", foo);
-    //       inst.address = i as u32;
-    //       inst.address_mode = foo.1;
-    //       inst.opcode = foo.0;
-    //       inst.lenght = foo.2;
-    //     } else if let Some(foo) = decode_group_I(*byte) {
-    //       self.fetching_instruction = true;
-    //       bytes_to_read = foo.2 - 1;
-    //       // println!("Addr: {:x},{:?}, {:?}, {:}", i, foo.0, foo.1, foo.2);
-    //       println!("{:?}", foo);
-    //       inst.address = i as u32;
-    //       inst.address_mode = foo.1;
-    //       inst.opcode = foo.0;
-    //       inst.lenght = foo.2;
-    //     } else {
-    //       println!("Nothing found... {:x}", &byte);
-    //     }
-    //   } else {
-    //     // bytes_to_read -= 1;
-    //     if bytes_to_read < 1 {
-    //       println!("Pushing new instruction, {:?}", inst);
-    //       self.fetching_instruction = false;
-    //       self.instructions.push(inst.clone());
-    //     } else if bytes_to_read == 3 {
-    //       inst.operants.operant_bank = *byte;
-    //       bytes_to_read -= 1;
-    //     } else if bytes_to_read == 2 {
-    //       inst.operants.operant_high = *byte;
-    //       bytes_to_read -= 1;
-    //     } else if bytes_to_read == 1 {
-    //       inst.operants.operant_low = *byte;
-    //       bytes_to_read -= 1;
-    //     }
-    //   }
-    // }
   }
 
-  pub fn decode(&self, opcode: u8) -> Option<(Opcodes, AddressModes, usize)> {
+  pub fn decode(&self, opcode: u8) -> Result<(Opcodes, AddressModes), &'static str> {
     // Group I decode
-
     if let Some(instr) = decode_group_III(opcode) {
       // println!("Group III: {:?}", instr);
-      return Some(instr);
+      return Ok(instr);
     } else if let Some(instr) = decode_group_II(opcode) {
       // println!("Group II: {:?}", instr);
-      return Some(instr);
+      return Ok(instr);
     } else if let Some(instr) = decode_group_I(opcode) {
       // println!("Group I: {:?}", instr);
-      return Some(instr);
+      return Ok(instr);
     }
-    None
+    // This should never happen because everyting between 0x00..=0xff is interpreted
+    Err("Could not decode opcode")
   }
 
   pub fn printInstructions(&self) {
     for i in &self.instructions {
       // println!("{:?}", i);
-      println!("{:?} {:?}", i.opcode, i.operants);
+      println!(
+        "{:x}, {:?} {:?} {:?}",
+        i.address, i.opcode, i.address_mode, i.operants
+      );
     }
   }
 }

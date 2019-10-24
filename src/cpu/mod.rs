@@ -1,5 +1,5 @@
-use constants::GI_MASK;
 use byte_struct::*;
+use constants::GI_MASK;
 // enum Opcodes {}
 
 pub mod constants;
@@ -19,6 +19,21 @@ bitfields!(
   }
 );
 
+impl Default for StatusRegister {
+  fn default() -> StatusRegister {
+    StatusRegister {
+      c: 0,
+      z: 0,
+      i: 0,
+      d: 0,
+      x: 0,
+      m: 0,
+      v: 0,
+      n: 0,
+    }
+  }
+}
+
 bitfields!(
   #[derive(PartialEq, Debug)]
   pub Accumulator: u16 {
@@ -26,6 +41,12 @@ bitfields!(
     B: 8,
   }
 );
+
+impl Default for Accumulator {
+  fn default() -> Accumulator {
+    Accumulator { A: 0, B: 0 }
+  }
+}
 
 bitfields!(
   #[derive(PartialEq, Debug)]
@@ -35,8 +56,18 @@ bitfields!(
   }
 );
 
+impl Default for IndexRegister {
+  fn default() -> IndexRegister {
+    IndexRegister {
+      register: 0,
+      index: 0,
+    }
+  }
+}
+
 // TODO: Proper inital state
-// #[derive(ByteStzruct, PartialEq, Debug)]
+#[derive(ByteStruct, PartialEq, Debug)]
+#[byte_struct_le]
 pub struct Registers {
   P: StatusRegister,
   C: Accumulator,
@@ -49,8 +80,31 @@ pub struct Registers {
   PC: u16,          // Programm Counter
 }
 
+#[derive(Debug)]
 pub struct CPU {
   regs: Registers,
-  emulation_mode: bool,
 }
 
+impl Default for Registers {
+  fn default() -> Registers {
+    Registers {
+      P: StatusRegister::default(),
+      C: Accumulator::default(),
+      X: IndexRegister::default(),
+      Y: IndexRegister::default(),
+      D: 0,
+      S: 0,
+      PBR: 0,
+      DBR: 0,
+      PC: 0,
+    }
+  }
+}
+
+impl CPU {
+  pub fn new() -> CPU {
+    CPU {
+      regs: Registers::default(),
+    }
+  }
+}

@@ -8,6 +8,7 @@ mod cpu;
 
 // use crate::cpu::constants::GI_MASK;
 use crate::cpu::instructions::*;
+use crate::cpu::*;
 
 // #[macro_use]
 // extern crate bitpat;
@@ -49,9 +50,13 @@ fn main() -> std::io::Result<()> {
 
   println!("reset vector: {:x}", reset_vector);
 
-  decoder.read_instructions(&card.read_bytes(reset_vector as usize, 0x00010));
+  let mut cpu = CPU::new();
+
+  decoder.read_instructions(&mut cpu, &card.read_bytes(reset_vector as usize, 0x00ff));
 
   decoder.printInstructions();
+
+  // println!("CPU {:?}", cpu);
 
   // println!("{:?}", decoder);
 
