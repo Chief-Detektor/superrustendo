@@ -5,6 +5,11 @@ use constants::GI_MASK;
 pub mod constants;
 pub mod instructions;
 
+pub struct Stack {
+  contents: [u8; 0xffff - 1],
+  // constents: Vec<u8>,
+}
+
 bitfields!(
   #[derive(PartialEq, Debug)]
   pub StatusRegister: u8 {

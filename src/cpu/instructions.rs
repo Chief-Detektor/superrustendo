@@ -84,62 +84,62 @@ impl Default for AddressModes {
   }
 }
 
-fn get_gii_reg_load_addr_mode(opcode: u8) -> Option<(AddressModes, usize)> {
+fn get_gii_reg_load_addr_mode(opcode: u8) -> Option<AddressModes> {
   let mask = (opcode & GII_MASK);
   match mask {
-    G2_REGLOAD_ADDR_MODE_IMMEDIATE => Some((AddressModes::Immediate, 2)),
-    G2_REGLOAD_ADDR_MODE_DIRECT_PAGE => Some((AddressModes::DirectPage, 2)),
-    G2_REGLOAD_ADDR_MODE_ABSOLUTE => Some((AddressModes::Absolute, 3)),
-    G2_REGLOAD_ADDR_MODE_DIRECT_PAGE_INDEXED => Some((AddressModes::DirectPageIndexedX, 2)),
-    G2_REGLOAD_ADDR_MODE_ABSOLUTE_INDEXED => Some((AddressModes::AbsoluteIndexedX, 3)),
+    G2_REGLOAD_ADDR_MODE_IMMEDIATE => Some(AddressModes::Immediate),
+    G2_REGLOAD_ADDR_MODE_DIRECT_PAGE => Some(AddressModes::DirectPage),
+    G2_REGLOAD_ADDR_MODE_ABSOLUTE => Some(AddressModes::Absolute),
+    G2_REGLOAD_ADDR_MODE_DIRECT_PAGE_INDEXED => Some(AddressModes::DirectPageIndexedX),
+    G2_REGLOAD_ADDR_MODE_ABSOLUTE_INDEXED => Some(AddressModes::AbsoluteIndexedX),
     _ => None,
   }
 }
 
-fn get_gii_addr_mode(opcode: u8) -> Option<(AddressModes, usize)> {
+fn get_gii_addr_mode(opcode: u8) -> Option<AddressModes> {
   let mask = (opcode & GII_MASK);
   //  & (opcode & GII_MASK2);
 
   // println!("get_ii_addr_mode {:b}, opcode: {:b}", mask, opcode);
   match mask {
-    G2_ADDR_MODE_ACCUMULATOR => Some((AddressModes::Accumulator, 1)),
-    G2_ADDR_MODE_ABSOLUTE => Some((AddressModes::Absolute, 3)),
-    G2_ADDR_MODE_DIRECT_ZERO_PAGE => Some((AddressModes::DirectPage, 2)),
-    G2_ADDR_MODE_ABSOLUTE_INDEXED_X => Some((AddressModes::AbsoluteIndexedX, 3)),
-    G2_ADDR_MODE_DIRECT_ZERO_PAGE_INDEXED_X => Some((AddressModes::DirectPageIndexedX, 2)),
+    G2_ADDR_MODE_ACCUMULATOR => Some(AddressModes::Accumulator),
+    G2_ADDR_MODE_ABSOLUTE => Some(AddressModes::Absolute),
+    G2_ADDR_MODE_DIRECT_ZERO_PAGE => Some(AddressModes::DirectPage),
+    G2_ADDR_MODE_ABSOLUTE_INDEXED_X => Some(AddressModes::AbsoluteIndexedX),
+    G2_ADDR_MODE_DIRECT_ZERO_PAGE_INDEXED_X => Some(AddressModes::DirectPageIndexedX),
     _ => None,
   }
 }
 
-fn get_gi_addr_mode(opcode: u8) -> Option<(AddressModes, usize)> {
+fn get_gi_addr_mode(opcode: u8) -> Option<AddressModes> {
   let mask = opcode & GI_MASK;
 
   // println!("G1 opcode: {:b}, mask: {:b}", opcode, mask);
 
   match mask {
-    GI_ADDR_MODE_INTERMEDIATE => Some((AddressModes::Immediate, 2)), // Add 1 byte if m = 0 (16Bit memory/accumulator)
-    GI_ADDR_MODE_DIRECT_ZERO_PAGE => Some((AddressModes::DirectPage, 2)),
-    GI_ADDR_MODE_ABSOLUTE => Some((AddressModes::Absolute, 3)),
-    GI_ADDR_MODE_DIRECT_ZERO_PAGE_INDEXED_X => Some((AddressModes::DirectPageIndexedX, 2)),
-    GI_ADDR_MODE_ABSOLUTE_INDEXED_X => Some((AddressModes::AbsoluteIndexedX, 3)),
-    GI_ADDR_MODE_ABSOLUTE_INDEXED_Y => Some((AddressModes::AbsoluteIndexedY, 3)),
+    GI_ADDR_MODE_INTERMEDIATE => Some(AddressModes::Immediate), // Add 1 byte if m = 0 (16Bit memory/accumulator)
+    GI_ADDR_MODE_DIRECT_ZERO_PAGE => Some(AddressModes::DirectPage),
+    GI_ADDR_MODE_ABSOLUTE => Some(AddressModes::Absolute),
+    GI_ADDR_MODE_DIRECT_ZERO_PAGE_INDEXED_X => Some(AddressModes::DirectPageIndexedX),
+    GI_ADDR_MODE_ABSOLUTE_INDEXED_X => Some(AddressModes::AbsoluteIndexedX),
+    GI_ADDR_MODE_ABSOLUTE_INDEXED_Y => Some(AddressModes::AbsoluteIndexedY),
     GI_ADDR_MODE_DIRECT_ZERO_PAGE_INDEXED_INDIRECT_X => {
-      Some((AddressModes::DirectPageIndexedIndirectX, 2))
+      Some(AddressModes::DirectPageIndexedIndirectX)
     }
     GI_ADDR_MODE_DIRECT_ZERO_PAGE_INDEXED_INDIRECT_Y => {
-      Some((AddressModes::DirectPageIndexedIndirectY, 2))
+      Some(AddressModes::DirectPageIndexedIndirectY)
     }
     GI_ADDR_MODE_DIRECT_PAGE_INDIRECT_LONG_INDEXED_Y => {
-      Some((AddressModes::DirectPageIndirectLongIndexedY, 2))
+      Some(AddressModes::DirectPageIndirectLongIndexedY)
     }
-    GI_ADDR_MODE_DIRECT_PAGE_INDIRECT_LONG => Some((AddressModes::DirectPageIndirectLong, 2)),
-    GI_ADDR_MODE_ABSOLUTE_LONG => Some((AddressModes::AbsoluteLong, 4)),
-    GI_ADDR_MODE_ABSOLUTE_LONG_INDEXED_X => Some((AddressModes::AbsoluteLongIndexedX, 4)),
-    GI_ADDR_MODE_STACK_RELATIVE => Some((AddressModes::StackRelative, 2)),
+    GI_ADDR_MODE_DIRECT_PAGE_INDIRECT_LONG => Some(AddressModes::DirectPageIndirectLong),
+    GI_ADDR_MODE_ABSOLUTE_LONG => Some(AddressModes::AbsoluteLong),
+    GI_ADDR_MODE_ABSOLUTE_LONG_INDEXED_X => Some(AddressModes::AbsoluteLongIndexedX),
+    GI_ADDR_MODE_STACK_RELATIVE => Some(AddressModes::StackRelative),
     GI_ADDR_MODE_STACK_RELATIVE_INDIRECT_INDEXED_Y => {
-      Some((AddressModes::StackRelativeIndirectIndexedY, 2))
+      Some(AddressModes::StackRelativeIndirectIndexedY)
     }
-    GI_ADDR_MODE_DIRECT_PAGE_INDIRECT => Some((AddressModes::DirectPageIndirect, 2)),
+    GI_ADDR_MODE_DIRECT_PAGE_INDIRECT => Some(AddressModes::DirectPageIndirect),
     _ => {
       return None;
     }
@@ -168,6 +168,9 @@ pub struct Instruction {
 impl Instruction {
   fn execute(&mut self, cpu: &mut CPU) {
     match &self.opcode {
+      Opcodes::BRK => {
+        cpu.regs.PC += 2;
+      }
       Opcodes::SEI => {
         println!("SEI!");
         cpu.regs.P.i = 1;
@@ -491,28 +494,28 @@ pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
     G2_OP_DEC => {
       // println!("Test for DEC {:b}", opcode);
       if let Some(address_mode) = get_gii_addr_mode(opcode) {
-        return Some((Opcodes::DEC, address_mode.0));
+        return Some((Opcodes::DEC, address_mode));
       } else {
         return None;
       }
     }
     G2_OP_INC => {
       if let Some(addr_mode) = get_gii_addr_mode(opcode) {
-        return Some((Opcodes::INC, addr_mode.0));
+        return Some((Opcodes::INC, addr_mode));
       } else {
         return None;
       }
     }
     G2_OP_STX => {
       if let Some(address_mode) = get_gii_addr_mode(opcode) {
-        return Some((Opcodes::STX, address_mode.0));
+        return Some((Opcodes::STX, address_mode));
       } else {
         return None;
       }
     }
     G2_OP_STY => {
       if let Some(address_mode) = get_gii_addr_mode(opcode) {
-        return Some((Opcodes::STY, address_mode.0));
+        return Some((Opcodes::STY, address_mode));
       } else {
         return None;
       }
@@ -523,28 +526,28 @@ pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   match g2_mask {
     G2_OP_ASL => {
       if let Some(addr_mode) = get_gii_addr_mode(opcode) {
-        Some((Opcodes::ASL, addr_mode.0))
+        Some((Opcodes::ASL, addr_mode))
       } else {
         None
       }
     }
     G2_OP_LSR => {
       if let Some(addr_mode) = get_gii_addr_mode(opcode) {
-        Some((Opcodes::LSR, addr_mode.0))
+        Some((Opcodes::LSR, addr_mode))
       } else {
         None
       }
     }
     G2_OP_ROL => {
       if let Some(addr_mode) = get_gii_addr_mode(opcode) {
-        Some((Opcodes::ROL, addr_mode.0))
+        Some((Opcodes::ROL, addr_mode))
       } else {
         None
       }
     }
     G2_OP_ROR => {
       if let Some(address_mode) = get_gii_addr_mode(opcode) {
-        Some((Opcodes::ROR, address_mode.0))
+        Some((Opcodes::ROR, address_mode))
       } else {
         None
       }
@@ -552,14 +555,14 @@ pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
     // Diffrend addressing here
     G2_OP_LDX => {
       if let Some(address_mode) = get_gii_reg_load_addr_mode(opcode) {
-        Some((Opcodes::LDX, address_mode.0))
+        Some((Opcodes::LDX, address_mode))
       } else {
         None
       }
     }
     G2_OP_LDY => {
       if let Some(address_mode) = get_gii_reg_load_addr_mode(opcode) {
-        Some((Opcodes::LDY, address_mode.0))
+        Some((Opcodes::LDY, address_mode))
       } else {
         None
       }
@@ -576,56 +579,56 @@ pub fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   match g1_mask {
     G1_OP_ADC => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::ADC, addr_mode.0))
+        Some((Opcodes::ADC, addr_mode))
       } else {
         None
       }
     }
     G1_OP_AND => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::AND, addr_mode.0))
+        Some((Opcodes::AND, addr_mode))
       } else {
         None
       }
     }
     G1_OP_CMP => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::CMP, addr_mode.0))
+        Some((Opcodes::CMP, addr_mode))
       } else {
         None
       }
     }
     G1_OP_EOR => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::EOR, addr_mode.0))
+        Some((Opcodes::EOR, addr_mode))
       } else {
         None
       }
     }
     G1_OP_LDA => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::LDA, addr_mode.0))
+        Some((Opcodes::LDA, addr_mode))
       } else {
         None
       }
     }
     G1_OP_ORA => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::ORA, addr_mode.0))
+        Some((Opcodes::ORA, addr_mode))
       } else {
         None
       }
     }
     G1_OP_SBC => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::SBC, addr_mode.0))
+        Some((Opcodes::SBC, addr_mode))
       } else {
         None
       }
     }
     G1_OP_STA => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        Some((Opcodes::STA, addr_mode.0))
+        Some((Opcodes::STA, addr_mode))
       } else {
         None
       }
@@ -650,7 +653,6 @@ impl Decoder {
       instructions: Vec::new(),
     }
   }
-
   // fn read_instruction(byte: u8)
   // TODO: Offset in instruction address
   pub fn read_instructions(&mut self, mut cpu: &mut CPU, bytes: &Vec<u8>) /*-> Instruction*/
