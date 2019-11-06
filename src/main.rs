@@ -52,6 +52,9 @@ fn main() -> std::io::Result<()> {
 
   let mut cpu = CPU::new();
 
+  // TODO: give read instructions the bytearray and the reset vector.
+  // Also it might be better to store the interrupt vectors on the cpu or the cartridge..
+
   decoder.read_instructions(&mut cpu, &card.read_bytes(reset_vector as usize, 0x00ff));
 
   decoder.printInstructions();

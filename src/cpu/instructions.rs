@@ -655,6 +655,8 @@ impl Decoder {
   }
   // fn read_instruction(byte: u8)
   // TODO: Offset in instruction address
+  // TODO: Use PC for opcode adressing.
+  // Also it's desireable to index the starting offset correctly in order to know where these Instructions live in the binary/rom.
   pub fn read_instructions(&mut self, mut cpu: &mut CPU, bytes: &Vec<u8>) /*-> Instruction*/
   {
     let mut bytes_to_read = 0;
