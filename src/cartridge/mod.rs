@@ -33,18 +33,19 @@ struct SnesHeader {
   emu_irq: u16, // (0x97, 0xff)
 }
 
-pub struct Cardridge {
+#[derive(Debug)]
+pub struct Cartridge {
   rom: Vec<u8>,
   pub size: usize,
 }
 
-impl Cardridge {
-  pub fn load_rom(path: &Path) -> Cardridge {
+impl Cartridge {
+  pub fn load_rom(path: &Path) -> Cartridge {
     let mut file = File::open(path).unwrap();
     let mut rom = Vec::new();
     let size = file.read_to_end(&mut rom).unwrap();
 
-    Cardridge { rom, size }
+    Cartridge { rom, size }
   }
 
   pub fn read_byte(&self, address: usize) -> u8 {

@@ -1,5 +1,6 @@
 use super::constants::*;
 use super::Registers;
+use crate::cartridge::Cartridge;
 use super::CPU;
 use byte_struct::*;
 

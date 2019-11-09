@@ -40,7 +40,7 @@ fn main() -> std::io::Result<()> {
   // let mut f = File::open(Path::new("International Superstar Soccer Deluxe (U).smc")).unwrap();
   // f.read_to_end(&mut rom);
 
-  let card = cartridge::Cardridge::load_rom(Path::new("elix-nu-pal.sfc"));
+  let mut card = cartridge::Cartridge::load_rom(Path::new("elix-nu-pal.sfc"));
 
   // println!("{:x} at {:x}", card.read_byte(0xffa0), 0xff0a);
 
