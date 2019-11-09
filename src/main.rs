@@ -22,7 +22,7 @@ fn main() -> std::io::Result<()> {
   let size = file.read_to_end(&mut buf)?;
 
   // Decoder::decode(buf[3]);
-  let mut decoder = Decoder::new();
+  // let mut decoder = Decoder::new();
 
   // decoder.read_instructions(&buf);
 
@@ -52,12 +52,18 @@ fn main() -> std::io::Result<()> {
 
   let mut cpu = CPU::new();
 
+  let decoder = Decoder::new(&mut cpu, &mut card);
+
+  for i in decoder {
+    println!("{:?}", i);
+  }
+
   // TODO: give read instructions the bytearray and the reset vector.
   // Also it might be better to store the interrupt vectors on the cpu or the cartridge..
 
-  decoder.read_instructions(&mut cpu, &card.read_bytes(reset_vector as usize, 0x00ff));
+  // decoder.read_instructions(&mut cpu, &mut card.read_bytes(reset_vector as usize, 0x00ff));
 
-  decoder.printInstructions();
+  // decoder.printInstructions();
 
   // println!("CPU {:?}", cpu);
 

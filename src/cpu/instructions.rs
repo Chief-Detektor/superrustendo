@@ -642,16 +642,20 @@ pub fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
 }
 
 #[derive(Debug)]
-pub struct Decoder {
+pub struct Decoder<'t> {
   fetching_instruction: bool,
   instructions: Vec<Instruction>,
+  cartridge: &'t mut Cartridge,
+  cpu: &'t mut CPU,
 }
 
-impl Decoder {
-  pub fn new() -> Decoder {
+impl <'t>Decoder<'t> {
+  pub fn new(mut cpu: &'t mut super::CPU, mut cartridge: &'t mut crate::cartridge::Cartridge) -> Decoder<'t> {
     Decoder {
       fetching_instruction: false,
       instructions: Vec::new(),
+      cartridge: cartridge,
+      cpu: cpu,
     }
   }
   // fn read_instruction(byte: u8)
@@ -750,5 +754,15 @@ impl Decoder {
         i.address, i.opcode, i.address_mode, i.operants
       );
     }
+  }
+}
+
+// This needs to be on ROM?
+impl Iterator for Decoder<'_> {
+  type Item = Instruction;
+
+  fn next(&mut self) -> Option<Instruction> {
+    // None
+    Some(Instruction::default())
   }
 }

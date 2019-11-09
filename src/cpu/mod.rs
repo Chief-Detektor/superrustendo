@@ -1,5 +1,6 @@
-use byte_struct::*;
-use constants::GI_MASK;
+use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByteOrder};
+
+
 // enum Opcodes {}
 
 pub mod constants;
