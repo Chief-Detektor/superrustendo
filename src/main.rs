@@ -52,11 +52,26 @@ fn main() -> std::io::Result<()> {
 
   let mut cpu = CPU::new();
 
-  let decoder = Decoder::new(&mut cpu, &mut card);
+  cpu.regs.PC = 0x4;
 
-  for i in decoder {
-    println!("{:?}", i);
-  }
+  let mut decoder = Decoder::new(&mut cpu, &mut card);
+
+  // for i in decoder {
+  //   println!("{:?}", i);
+  // }
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
+  println!("{:?}", &decoder.next());
 
   // TODO: give read instructions the bytearray and the reset vector.
   // Also it might be better to store the interrupt vectors on the cpu or the cartridge..

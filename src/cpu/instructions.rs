@@ -1,8 +1,8 @@
 use super::constants::*;
 use super::Registers;
-use crate::cartridge::Cartridge;
 use super::CPU;
-use byte_struct::*;
+use crate::cartridge::Cartridge;
+use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByteOrder};
 
 #[derive(Debug, Clone)]
 pub enum AddressModes {
@@ -40,8 +40,9 @@ pub enum AddressModes {
   Unknown,
 }
 
+// TODO: Pass in CPU native or emulation mode in order to return correct len
 impl AddressModes {
-  pub fn len(&self) -> usize {
+  pub fn len(&self, regs: &Registers, op: &Opcodes) -> usize {
     match self {
       AddressModes::Absolute => 3,
       AddressModes::AbsoluteIndexedIndirect => 3,
@@ -59,7 +60,22 @@ impl AddressModes {
       AddressModes::DirectPageIndirect => 2,
       AddressModes::DirectPageIndirectLong => 2,
       AddressModes::DirectPageIndirectLongIndexedY => 2,
-      AddressModes::Immediate => 2,
+      AddressModes::Immediate => {
+        match *op {
+          Opcodes::LDX => {
+            if regs.P.x != 1 {
+              return 3;
+            }
+          }
+          Opcodes::LDA => {
+            if regs.P.m != 1 {
+              return 3;
+            }
+          }
+          _ => {}
+        }
+        return 2;
+      }
       AddressModes::Implied => 1,
       AddressModes::ProgrammCounterRelative => 2,
       AddressModes::ProgrammCounterRelativeLong => 3,
@@ -148,13 +164,13 @@ fn get_gi_addr_mode(opcode: u8) -> Option<AddressModes> {
   // return true;
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct Operants {
-  // pub operant_low: u8,
-  // pub operant_high: u8,
-  // pub operant_bank: u8,
-  pub bytes: [u8; 4],
-}
+// #[derive(Debug, Default, Clone)]
+// pub struct Operants {
+//   // pub operant_low: u8,
+//   // pub operant_high: u8,
+//   // pub operant_bank: u8,
+//   pub bytes: Vec<u8>,
+// }
 
 #[derive(Debug, Default, Clone)]
 pub struct Instruction {
@@ -162,7 +178,7 @@ pub struct Instruction {
   pub opcode: Opcodes,
   pub address_mode: AddressModes,
   lenght: usize,
-  pub operants: Operants,
+  pub payload: Vec<u8>,
   cycles: usize,
 }
 
@@ -173,36 +189,51 @@ impl Instruction {
         cpu.regs.PC += 2;
       }
       Opcodes::SEI => {
-        println!("SEI!");
         cpu.regs.P.i = 1;
       }
       Opcodes::CLC => {
         cpu.regs.P.c = 0;
       }
+      Opcodes::XCE => {
+        // Exchange carry with phantom emulation flag
+        let temp = cpu.e;
+        cpu.e = cpu.regs.P.c != 0;
+        cpu.regs.P.c = temp as _;
+      }
       Opcodes::REP => {
-        println!("REP{:?}", cpu.regs.P);
-        if cpu.regs.P.c == 0 {
-          // cpu.regs.P.write_bytes_default_le(&mut [0xff]);
-          // Registers::read_bytes(self.operants.bytes[0])
-          //cpu.regs.P & !self.operants.bytes[0]
-          println!("REP1: {:?}", cpu.regs.P);
-        } else {
-          println!("Rep2: {:?}", cpu.regs.P);
-        }
+        // println!("REP{:?}", cpu.regs.P);
+        // println!("Payload: {:x}", self.payload[0]);
+        let mut next = [0x00];
+        // byte_struct::ByteStructUnspecifiedByteOrder::write_bytes_default_le(&cpu.regs.P, &mut next);
+        cpu.regs.P.write_bytes_default_le(&mut next);
+        let foo = next[0] | self.payload[0];
+        // println!("next: {:x}", foo);
+        cpu.regs.P = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[foo]);
+        // println!("REP1: {:?}", cpu.regs);
         // cpu.regs.p =
       }
       Opcodes::LDX => {
-        if cpu.regs.P.x == 0 {
-          self.lenght += 1;
-          // println!("LDX!!!!!!!! {:?}", self);
+        if cpu.regs.P.x != 1 {
+          cpu.regs.C = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[
+            self.payload[1],
+            self.payload[0],
+          ]);
+        } else {
+          // println!("LDX payload: {:?}", self.payload);
+          // let mut foo = self.payload[0];
+          cpu.regs.C = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[
+            0x00,
+            self.payload[0],
+          ]);
         }
+        println!("{:?}", cpu.regs.C);
       }
       _ => {}
     }
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Opcodes {
   Unknown,
   // Group I Opcodes
@@ -649,84 +680,16 @@ pub struct Decoder<'t> {
   cpu: &'t mut CPU,
 }
 
-impl <'t>Decoder<'t> {
-  pub fn new(mut cpu: &'t mut super::CPU, mut cartridge: &'t mut crate::cartridge::Cartridge) -> Decoder<'t> {
+impl<'t> Decoder<'t> {
+  pub fn new(
+    mut cpu: &'t mut super::CPU,
+    mut cartridge: &'t mut crate::cartridge::Cartridge,
+  ) -> Decoder<'t> {
     Decoder {
       fetching_instruction: false,
       instructions: Vec::new(),
       cartridge: cartridge,
       cpu: cpu,
-    }
-  }
-  // fn read_instruction(byte: u8)
-  // TODO: Offset in instruction address
-  // TODO: Use PC for opcode adressing.
-  // Also it's desireable to index the starting offset correctly in order to know where these Instructions live in the binary/rom.
-  pub fn read_instructions(&mut self, mut cpu: &mut CPU, bytes: &Vec<u8>) /*-> Instruction*/
-  {
-    let mut bytes_to_read = 0;
-    // let mut address = 0;
-    for (i, byte) in bytes.iter().enumerate() {
-      let mut inst = Instruction::default();
-      if !self.fetching_instruction {
-        if let Ok(ins) = self.decode(*byte) {
-          print!("{:x} ", *byte);
-          self.fetching_instruction = true;
-          inst.address = i as _;
-          inst.opcode = ins.0;
-          inst.address_mode = ins.1; // println!("{:?}", i);
-          inst.lenght = inst.address_mode.len();
-          inst.execute(&mut cpu);
-          bytes_to_read = inst.lenght;
-          if bytes_to_read == 1 {
-            self.fetching_instruction = false;
-          // println!("{:?}", inst);
-          } else {
-            // inst.operants = Some(Operants::default());
-          }
-
-          // println!("{:?}", inst);
-          self.instructions.push(inst);
-          bytes_to_read -= 1;
-        }
-      } else {
-        let pos = self.instructions.len() - 1;
-        // println!("Pos: {:}", pos);
-        let mut ins = self.instructions.get_mut(pos).unwrap();
-        // ins.execute(&mut cpu);
-        match bytes_to_read {
-          // 4 => {
-          //   ins.operants.bytes[3] = *byte;
-          //   bytes_to_read -= 1;
-          // }
-          3 => {
-            ins.operants.bytes[2] = *byte;
-            bytes_to_read -= 1;
-          }
-          2 => {
-            ins.operants.bytes[1] = *byte;
-            bytes_to_read -= 1;
-          }
-          1 => {
-            ins.operants.bytes[0] = *byte;
-            bytes_to_read -= 1;
-            self.fetching_instruction = false;
-
-            // ins.execute(&mut cpu);
-          }
-          _ => {}
-        }
-        // Execute command to change cpu state
-        // println!("{:?}", ins);
-
-        // println!("Bytes to read: {}", bytes_to_read);
-        // println!(
-        //   "Payload {:x}, {:?}",
-        //   *byte,
-        //   self.instructions[self.instructions.len() - 1]
-        // );
-        // println!("");
-      }
     }
   }
 
@@ -746,15 +709,15 @@ impl <'t>Decoder<'t> {
     Err("Could not decode opcode")
   }
 
-  pub fn printInstructions(&self) {
-    for i in &self.instructions {
-      // println!("{:?}", i);
-      println!(
-        "{:x}, {:?} {:?} {:?}",
-        i.address, i.opcode, i.address_mode, i.operants
-      );
-    }
-  }
+  // pub fn printInstructions(&self) {
+  //   for i in &self.instructions {
+  //     // println!("{:?}", i);
+  //     println!(
+  //       "{:x}, {:?} {:?} {:?}",
+  //       i.address, i.opcode, i.address_mode, i.operants
+  //     );
+  //   }
+  // }
 }
 
 // This needs to be on ROM?
@@ -762,7 +725,27 @@ impl Iterator for Decoder<'_> {
   type Item = Instruction;
 
   fn next(&mut self) -> Option<Instruction> {
+    let inst = self
+      .decode(self.cartridge.read_byte(self.cpu.regs.PC as _))
+      .unwrap();
+
+    // increase Programm Counter
+    let payload = self.cartridge.read_bytes(
+      (self.cpu.regs.PC + 1) as usize, // The payload starts 1 after opcode
+      inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
+    );
+
+    let mut instr = Instruction::default();
+    instr.address = self.cpu.regs.PC as _;
+    self.cpu.regs.PC += inst.1.len(&self.cpu.regs, &inst.0) as u16;
+
+    instr.opcode = inst.0;
+    instr.address_mode = inst.1;
+    instr.payload = payload;
+    instr.execute(&mut self.cpu);
+
+    // println!("{:?}, {:x}, {:?}", inst, self.cpu.regs.PC, payload);
     // None
-    Some(Instruction::default())
+    Some(instr)
   }
 }

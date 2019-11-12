@@ -1,6 +1,5 @@
 use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByteOrder};
 
-
 // enum Opcodes {}
 
 pub mod constants;
@@ -14,37 +13,38 @@ pub struct Stack {
 bitfields!(
   #[derive(PartialEq, Debug)]
   pub StatusRegister: u8 {
-    c: 1,   // CarryBit / Emulation Mode
-    z: 1,   // Result Zero
-    i: 1,   // IRQ Disable
-    d: 1,   // Decimal Mde
-    x: 1,   // Index Register Select/Break Instruction
-    m: 1,   // Memory/Accumulator Select
-    v: 1,   // Overflow
-    n: 1,    // Negative
+      n: 1, // Negative
+      v: 1, // Overflow
+      m: 1, // Memory/Accumulator Select
+      x: 1, // Index Register Select/Break Instruction
+      d: 1, // Decimal Mde
+      i: 1, // IRQ Disable
+      z: 1, // Result Zero
+      c: 1, // CarryBit / Emulation Mode
   }
 );
 
 impl Default for StatusRegister {
   fn default() -> StatusRegister {
     StatusRegister {
-      c: 0,
-      z: 0,
-      i: 0,
-      d: 0,
-      x: 0,
-      m: 0,
-      v: 0,
       n: 0,
+      v: 0,
+      m: 0,
+      x: 0,
+      d: 0,
+      i: 0,
+      z: 0,
+      c: 0,
     }
   }
 }
 
 bitfields!(
+  // TODO: Verify order of A and B concerning byte order
   #[derive(PartialEq, Debug)]
   pub Accumulator: u16 {
-    A: 8,
-    B: 8,
+    pub B: 8,
+    pub A: 8,
   }
 );
 
@@ -83,12 +83,13 @@ pub struct Registers {
   S: u8,            // Stack Pointer
   PBR: u8,          // Programm Bank Register
   DBR: u8,          // Data Bank Register
-  PC: u16,          // Programm Counter
+  pub PC: u16,      // Programm Counter
 }
 
 #[derive(Debug)]
 pub struct CPU {
-  regs: Registers,
+  pub regs: Registers,
+  pub e: bool, // Emulation mode
 }
 
 impl Default for Registers {
@@ -111,6 +112,7 @@ impl CPU {
   pub fn new() -> CPU {
     CPU {
       regs: Registers::default(),
+      e: true,
     }
   }
 }

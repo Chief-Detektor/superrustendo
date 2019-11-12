@@ -54,15 +54,16 @@ impl Cartridge {
 
   pub fn read_u16(&self, address: usize) -> u16 {
     let ret = self.read_bytes(address, 2);
-    ret[0] as u16 | ((ret[1] as u16) << 8)
+    ret[1] as u16 | ((ret[0] as u16) << 8)
+    // ret[]
   }
 
   pub fn read_bytes(&self, address: usize, length: usize) -> Vec<u8> {
-    let mut ret = Vec::new();
+    let mut ret = Vec::with_capacity(length);
     for i in 0..length {
       ret.push(self.read_byte(address + i));
     }
-    // ret.reverse(); ? bc of little endian
+    ret.reverse();
     ret
   }
 }
