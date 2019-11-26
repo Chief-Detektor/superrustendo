@@ -420,6 +420,7 @@ pub enum Opcodes {
   SED,
   PLX,
   XCE,
+  SEP,
 }
 
 impl Default for Opcodes {
@@ -502,6 +503,11 @@ pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
       0xcc => return Some((Opcodes::CPY, AddressModes::Absolute)),
       _ => {}
     },
+    _ => {}
+  }
+
+  match opcode {
+    G3_OP_SEP => return Some((Opcodes::SEP, AddressModes::Immediate)), // This one was missing >_<
     _ => {}
   }
 

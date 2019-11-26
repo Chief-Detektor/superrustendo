@@ -125,6 +125,7 @@ pub const G3_OP_CLD: u8 = 0xd8;
 pub const G3_OP_PHX: u8 = 0xda;
 pub const G3_OP_STP: u8 = 0xdb;
 pub const G3_OP_CPX: u8 = 0xe0 | 0xe4 | 0xec;
+pub const G3_OP_SEP: u8 = 0xe2;
 pub const G3_OP_INX: u8 = 0xe8;
 pub const G3_OP_NOP: u8 = 0xea;
 pub const G3_OP_XBA: u8 = 0xeb;
