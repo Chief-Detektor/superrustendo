@@ -2,6 +2,8 @@ use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByt
 
 // enum Opcodes {}
 
+use std::fmt;
+
 pub mod constants;
 pub mod instructions;
 
@@ -11,18 +13,38 @@ pub struct Stack {
 }
 
 bitfields!(
-  #[derive(PartialEq, Debug)]
+  #[derive(PartialEq)]
   pub StatusRegister: u8 {
-      n: 1, // Negative
-      v: 1, // Overflow
-      m: 1, // Memory/Accumulator Select
-      x: 1, // Index Register Select/Break Instruction
-      d: 1, // Decimal Mde
-      i: 1, // IRQ Disable
-      z: 1, // Result Zero
+      // n: 1, // Negative
+      // v: 1, // Overflow
+      // m: 1, // Memory/Accumulator Select
+      // x: 1, // Index Register Select/Break Instruction
+      // d: 1, // Decimal Mde
+      // i: 1, // IRQ Disable
+      // z: 1, // Result Zero
+      // c: 1, // CarryBit / Emulation Mode
+
       c: 1, // CarryBit / Emulation Mode
-  }
+      z: 1, // Result Zero
+      i: 1, // IRQ Disable
+      d: 1, // Decimal Mde
+      x: 1, // Index Register Select/Break Instruction
+      m: 1, // Memory/Accumulator Select
+      v: 1, // Overflow
+      n: 1, // Negative
+   }
 );
+
+// NOTE: This is because default Debug prints the single bits in reverse order, which sucks to debug
+impl fmt::Debug for StatusRegister {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(
+      f,
+      "StatusRegister {{ n: {}, v: {}, m: {}, x: {}, d: {}, i: {}, z: {}, c: {} }}",
+      self.n, self.v, self.m, self.x, self.d, self.i, self.z, self.c
+    )
+  }
+}
 
 impl Default for StatusRegister {
   fn default() -> StatusRegister {
@@ -41,12 +63,18 @@ impl Default for StatusRegister {
 
 bitfields!(
   // TODO: Verify order of A and B concerning byte order
-  #[derive(PartialEq, Debug)]
+  #[derive(PartialEq)]
   pub Accumulator: u16 {
-    pub B: 8,
     pub A: 8,
+    pub B: 8,
   }
 );
+
+impl fmt::Debug for Accumulator {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "Accumulator {{ B: {:x}, A: {:x} }}", self.B, self.A)
+  }
+}
 
 impl Default for Accumulator {
   fn default() -> Accumulator {
@@ -57,17 +85,14 @@ impl Default for Accumulator {
 bitfields!(
   #[derive(PartialEq, Debug)]
   pub IndexRegister: u16 {
-    register: 8,
-    index: 8
+    low: 8,
+    high: 8
   }
 );
 
 impl Default for IndexRegister {
   fn default() -> IndexRegister {
-    IndexRegister {
-      register: 0,
-      index: 0,
-    }
+    IndexRegister { low: 0, high: 0 }
   }
 }
 
@@ -80,7 +105,7 @@ pub struct Registers {
   X: IndexRegister, // X Index Register,
   Y: IndexRegister, // Y Index Register,
   D: u16,           // Direct Page Register
-  S: u8,            // Stack Pointer
+  S: IndexRegister, // Stack Pointer (or 24 bits?)
   PBR: u8,          // Programm Bank Register
   DBR: u8,          // Data Bank Register
   pub PC: u16,      // Programm Counter
@@ -100,7 +125,7 @@ impl Default for Registers {
       X: IndexRegister::default(),
       Y: IndexRegister::default(),
       D: 0,
-      S: 0,
+      S: IndexRegister::default(),
       PBR: 0,
       DBR: 0,
       PC: 0,

@@ -59,19 +59,30 @@ fn main() -> std::io::Result<()> {
   // for i in decoder {
   //   println!("{:?}", i);
   // }
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
-  println!("{:?}", &decoder.next());
+  decoder.next().unwrap().print();
+  decoder.next().unwrap().print();
+  decoder.next().unwrap().print();
+  decoder.next().unwrap().print();
+  decoder.next().unwrap().print();
+  decoder.next().unwrap().print();
+  decoder.next().unwrap().print();
+  decoder.next().unwrap().print();
+  decoder.next().unwrap().print();
+  decoder.next().unwrap().print();
+  decoder.next().unwrap().print();
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
+  // println!("{:?}", &decoder.next());
 
   // TODO: give read instructions the bytearray and the reset vector.
   // Also it might be better to store the interrupt vectors on the cpu or the cartridge..

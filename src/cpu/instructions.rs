@@ -3,6 +3,7 @@ use super::Registers;
 use super::CPU;
 use crate::cartridge::Cartridge;
 use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByteOrder};
+use std::convert::TryInto;
 
 #[derive(Debug, Clone)]
 pub enum AddressModes {
@@ -102,7 +103,7 @@ impl Default for AddressModes {
 }
 
 fn get_gii_reg_load_addr_mode(opcode: u8) -> Option<AddressModes> {
-  let mask = (opcode & GII_MASK);
+  let mask = opcode & GII_MASK;
   match mask {
     G2_REGLOAD_ADDR_MODE_IMMEDIATE => Some(AddressModes::Immediate),
     G2_REGLOAD_ADDR_MODE_DIRECT_PAGE => Some(AddressModes::DirectPage),
@@ -114,7 +115,7 @@ fn get_gii_reg_load_addr_mode(opcode: u8) -> Option<AddressModes> {
 }
 
 fn get_gii_addr_mode(opcode: u8) -> Option<AddressModes> {
-  let mask = (opcode & GII_MASK);
+  let mask = opcode & GII_MASK;
   //  & (opcode & GII_MASK2);
 
   // println!("get_ii_addr_mode {:b}, opcode: {:b}", mask, opcode);
@@ -183,7 +184,7 @@ pub struct Instruction {
 }
 
 impl Instruction {
-  fn execute(&mut self, cpu: &mut CPU) {
+  fn execute(&mut self, cpu: &mut CPU, cartridge: &Cartridge) {
     match &self.opcode {
       Opcodes::BRK => {
         cpu.regs.PC += 2;
@@ -196,42 +197,133 @@ impl Instruction {
       }
       Opcodes::XCE => {
         // Exchange carry with phantom emulation flag
+        // TODO: Reset programm bank register
         let temp = cpu.e;
         cpu.e = cpu.regs.P.c != 0;
         cpu.regs.P.c = temp as _;
       }
       Opcodes::REP => {
-        // println!("REP{:?}", cpu.regs.P);
-        // println!("Payload: {:x}", self.payload[0]);
+        // cpu.regs.P.x = 1;
+        // println!("REP before {:?}", cpu.regs.P);
+        // println!("Payload: {:b}", self.payload[0]);
         let mut next = [0x00];
         // byte_struct::ByteStructUnspecifiedByteOrder::write_bytes_default_le(&cpu.regs.P, &mut next);
         cpu.regs.P.write_bytes_default_le(&mut next);
-        let foo = next[0] | self.payload[0];
-        // println!("next: {:x}", foo);
+        let foo = next[0] & !self.payload[0]; // Clear bits
         cpu.regs.P = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[foo]);
         // println!("REP1: {:?}", cpu.regs);
-        // cpu.regs.p =
+        // println!("REP after {:?}", cpu.regs.P);
       }
       Opcodes::LDX => {
         if cpu.regs.P.x != 1 {
-          cpu.regs.C = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[
-            self.payload[1],
-            self.payload[0],
+          let load_address = self.payload[1] as u16 | (self.payload[0] as u16) << 8;
+
+          let val = cartridge.read_u16(load_address.try_into().unwrap());
+
+          // Set cpu flags accordingly
+          if val == 0 {
+            cpu.regs.P.z = 1;
+          } else {
+            cpu.regs.P.z = 0;
+          }
+
+          if (val >> 7) == 1 {
+            cpu.regs.P.n = 1;
+          } else {
+            cpu.regs.P.n = 0;
+          }
+
+          // println!("LDX: val at {:x}:{:x}", load_address, val);
+
+          // TODO: Verify if this is correct
+          cpu.regs.X = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[
+            (val >> 8) as u8,
+            (val & 0xff00) as u8,
           ]);
         } else {
-          // println!("LDX payload: {:?}", self.payload);
-          // let mut foo = self.payload[0];
-          cpu.regs.C = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[
-            0x00,
-            self.payload[0],
-          ]);
+          let load_address = self.payload[0];
+          let val = cartridge.read_byte(load_address.try_into().unwrap());
+
+          // Set cpu flags accordingly
+          if val == 0 {
+            cpu.regs.P.z = 1;
+          } else {
+            cpu.regs.P.z = 0;
+          }
+
+          if (val >> 7) == 1 {
+            cpu.regs.P.n = 1;
+          } else {
+            cpu.regs.P.n = 0;
+          }
+
+          // cpu.regs.X.low = val.into();
+
+          cpu.regs.X.low =
+            byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[val]);
         }
-        println!("{:?}", cpu.regs.C);
+        // println!("{:?}", cpu.regs.C);
       }
+      Opcodes::TXS => {
+        if cpu.e {
+          // println!("TXS emu");
+          cpu.regs.S.high = 1; // High byte stack pointer is alsways 1
+          if cpu.regs.P.x != 1 {
+            // println!("16Bit index");
+            cpu.regs.S.low = cpu.regs.X.low;
+          } else {
+            cpu.regs.S.low = cpu.regs.X.low;
+            // println!("8Bit index");
+          }
+        } else {
+          // println!("TXS native");
+          if cpu.regs.P.x != 1 {
+            // println!("16Bit index");
+            cpu.regs.S.high = cpu.regs.X.high;
+            cpu.regs.S.low = cpu.regs.X.low;
+          } else {
+            // println!("8Bit index");
+            cpu.regs.S.high = 0;
+            cpu.regs.S.low = cpu.regs.X.low;
+          }
+        }
+        // println!("TXS: cpu {:?}", cpu.regs);
+      }
+      // Opcodes::ORA => {
+      //   if cpu.regs.P.m != 1 {
+      //     println!("{:?}", self.payload);
+      //     //16 bit
+
+      //     let mut foo = [0x00, 0x00];
+      //     let mut address =
+      //       self.payload[0] as u32 | (self.payload[1] as u32) << 8 | (self.payload[2] as u32) << 16;
+      //     cpu.regs.C.write_bytes_default_le(&mut foo);
+
+      //     // address += foo[1] as u32 | (foo[0] as u32) << 8 as u32;
+      //     address += 255;
+
+      //     println!(
+      //       "Addresss to load: {:x}, {:x}, {:x}",
+      //       address, foo[0], foo[1]
+      //     );
+      //   } else {
+      //     // 8 bit
+      //     println!("8Bit ORA");
+      //   }
+      // }
       _ => {}
     }
   }
+
+  pub fn print(&self) {
+    println!(
+      "0x{:x}: {:?} {:?} {:?}",
+      self.address, self.opcode, self.payload, self.address_mode
+    );
+  }
 }
+
+// impl std::fmt::LowerHex for std::vec::Vec<u8> {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Opcodes {
@@ -682,8 +774,8 @@ pub struct Decoder<'t> {
 
 impl<'t> Decoder<'t> {
   pub fn new(
-    mut cpu: &'t mut super::CPU,
-    mut cartridge: &'t mut crate::cartridge::Cartridge,
+    cpu: &'t mut super::CPU,
+    cartridge: &'t mut crate::cartridge::Cartridge,
   ) -> Decoder<'t> {
     Decoder {
       fetching_instruction: false,
@@ -729,7 +821,6 @@ impl Iterator for Decoder<'_> {
       .decode(self.cartridge.read_byte(self.cpu.regs.PC as _))
       .unwrap();
 
-    // increase Programm Counter
     let payload = self.cartridge.read_bytes(
       (self.cpu.regs.PC + 1) as usize, // The payload starts 1 after opcode
       inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
@@ -737,12 +828,13 @@ impl Iterator for Decoder<'_> {
 
     let mut instr = Instruction::default();
     instr.address = self.cpu.regs.PC as _;
+    // increase Programm Counter
     self.cpu.regs.PC += inst.1.len(&self.cpu.regs, &inst.0) as u16;
 
     instr.opcode = inst.0;
     instr.address_mode = inst.1;
     instr.payload = payload;
-    instr.execute(&mut self.cpu);
+    instr.execute(&mut self.cpu, &self.cartridge);
 
     // println!("{:?}, {:x}, {:?}", inst, self.cpu.regs.PC, payload);
     // None
