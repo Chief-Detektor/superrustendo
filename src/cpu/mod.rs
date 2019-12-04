@@ -1,29 +1,36 @@
 use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByteOrder};
 
-// enum Opcodes {}
-
 use std::fmt;
 
+pub mod addressmodes;
 pub mod constants;
 pub mod instructions;
 
+// #[derive(Debug)]
+
+// in emulation mode $100 to $1FF
 pub struct Stack {
-  contents: [u8; 0xffff - 1],
+  content: [u8; 0xffff - 1],
   // constents: Vec<u8>,
+}
+
+impl fmt::Debug for Stack {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "Stack {{ too large to print }}")
+  }
+}
+
+impl Default for Stack {
+  fn default() -> Stack {
+    Stack {
+      content: [0; 0xffff - 1],
+    }
+  }
 }
 
 bitfields!(
   #[derive(PartialEq)]
   pub StatusRegister: u8 {
-      // n: 1, // Negative
-      // v: 1, // Overflow
-      // m: 1, // Memory/Accumulator Select
-      // x: 1, // Index Register Select/Break Instruction
-      // d: 1, // Decimal Mde
-      // i: 1, // IRQ Disable
-      // z: 1, // Result Zero
-      // c: 1, // CarryBit / Emulation Mode
-
       c: 1, // CarryBit / Emulation Mode
       z: 1, // Result Zero
       i: 1, // IRQ Disable
@@ -62,7 +69,6 @@ impl Default for StatusRegister {
 }
 
 bitfields!(
-  // TODO: Verify order of A and B concerning byte order
   #[derive(PartialEq)]
   pub Accumulator: u16 {
     pub A: 8,
@@ -96,6 +102,15 @@ impl Default for IndexRegister {
   }
 }
 
+impl IndexRegister {
+  pub fn new() -> IndexRegister {
+    IndexRegister {
+      low: 0xff,
+      high: 0xff,
+    }
+  }
+}
+
 // TODO: Proper inital state
 #[derive(ByteStruct, PartialEq, Debug)]
 #[byte_struct_le]
@@ -114,6 +129,7 @@ pub struct Registers {
 #[derive(Debug)]
 pub struct CPU {
   pub regs: Registers,
+  pub stack: Stack,
   pub e: bool, // Emulation mode
 }
 
@@ -125,7 +141,7 @@ impl Default for Registers {
       X: IndexRegister::default(),
       Y: IndexRegister::default(),
       D: 0,
-      S: IndexRegister::default(),
+      S: IndexRegister::new(),
       PBR: 0,
       DBR: 0,
       PC: 0,
@@ -137,7 +153,36 @@ impl CPU {
   pub fn new() -> CPU {
     CPU {
       regs: Registers::default(),
+      stack: Stack::default(),
       e: true,
     }
   }
+
+  // This looks horrible..
+  // TODO: helper functions to deal with byte_struct to u16 and back
+  // pub fn stack_push(&mut self, data: u8) {
+  //   // decrease stack pointer
+  //   let mut stack_pointer = [0x0, 0x0];
+  //   self.regs.S.write_bytes_default_le(&mut stack_pointer);
+  //   let mut foo = (stack_pointer[1] as u16) << 8 | stack_pointer[0] as u16;
+  //   foo += 1;
+  //   self.regs.S = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&foo);
+
+  //   self.stack.content[stack_pointer[0] as usize | (stack_pointer[1] as usize) << 8] = data;
+  // }
+
+  // pub fn stack_pull(&mut self) -> u8 {
+  //   // increase stack pointer
+  //   let mut stack_pointer = [0x0, 0x0];
+  //   self.regs.S.write_bytes_default_le(&mut stack_pointer);
+  //   stack_pointer[0] = stack_pointer[0] - 1;
+  //   self.regs.S =
+  //     byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&stack_pointer);
+
+  //     byte_struct::ByteStructUnspecifiedByteOrder::
+
+  //   // let mut index = [0x0, 0x0];
+  //   // self.regs.P.write_bytes_default_le(&mut index);
+  //   self.stack.content[stack_pointer[0] as usize | (stack_pointer[1] as usize) << 8]
+  // }
 }

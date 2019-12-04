@@ -42,6 +42,8 @@ fn main() -> std::io::Result<()> {
 
   let mut card = cartridge::Cartridge::load_rom(Path::new("elix-nu-pal.sfc"));
 
+  println!("Loaded Cardidge: {:?}", card.header);
+
   // println!("{:x} at {:x}", card.read_byte(0xffa0), 0xff0a);
 
   // println!("{:x} at {:x}", card.read_u16(0x7ffc), 0x7ffc);
@@ -52,25 +54,30 @@ fn main() -> std::io::Result<()> {
 
   let mut cpu = CPU::new();
 
+  // TODO: Fix address offsets => rom mapping starts at 0x8000.. for bank 00
   cpu.regs.PC = 0x4;
+  // cpu.regs.PC = card.header.
+
+  println!("{:?}", cpu);
 
   let mut decoder = Decoder::new(&mut cpu, &mut card);
 
-  // for i in decoder {
-  //   println!("{:?}", i);
-  // }
-  decoder.next().unwrap().print();
-  decoder.next().unwrap().print();
-  decoder.next().unwrap().print();
-  decoder.next().unwrap().print();
-  decoder.next().unwrap().print();
-  decoder.next().unwrap().print();
-  decoder.next().unwrap().print();
-  decoder.next().unwrap().print();
-  decoder.next().unwrap().print();
-  decoder.next().unwrap().print();
-  decoder.next().unwrap().print();
-  // println!("{:?}", &decoder.next());
+  for i in decoder {
+    // println!("{:?}", i);
+    i.print();
+  }
+  // decoder.next().unwrap().print();
+  // decoder.next().unwrap().print();
+  // decoder.next().unwrap().print();
+  // decoder.next().unwrap().print();
+  // decoder.next().unwrap().print();
+  // decoder.next().unwrap().print();
+  // decoder.next().unwrap().print();
+  // decoder.next().unwrap().print();
+  // decoder.next().unwrap().print();
+  // decoder.next().unwrap().print();
+  // decoder.next().unwrap().print();
+  // // println!("{:?}", &decoder.next());
   // println!("{:?}", &decoder.next());
   // println!("{:?}", &decoder.next());
   // println!("{:?}", &decoder.next());
