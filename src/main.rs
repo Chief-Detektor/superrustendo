@@ -7,6 +7,7 @@ mod cartridge;
 mod cpu;
 
 // use crate::cpu::constants::GI_MASK;
+use crate::cpu::decoder::*;
 use crate::cpu::instructions::*;
 use crate::cpu::*;
 

@@ -9,5 +9,6 @@ edition = "2018"
 [dependencies]
 byte_struct = "0.6.0"
 byteorder = "1.3.2"
-bitpat = "0.1.1"
+# bitpat = "0.1.1"
+raw-string="0.3.5"
 # bit_field = "0.10.0"

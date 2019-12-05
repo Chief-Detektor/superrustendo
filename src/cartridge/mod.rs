@@ -67,19 +67,20 @@ pub struct SnesHeader {
   _padding2: [u8; 4],
   // Emulation Mode Vectors
   // 4 bytes 0xff
-  emu_cop: u16,   // (0x97, 0xff)
-  emu_brk: u16, // (0x97, 0xff) // fixed here: this is wrong at this side (https://en.wikibooks.org/wiki/Super_NES_Programming/SNES_memory_map#Interrupt_vectors)
+  emu_cop: u16, // (0x97, 0xff)
+  // emu_brk: u16, // (0x97, 0xff) // fixed here: this is wrong at this side (https://en.wikibooks.org/wiki/Super_NES_Programming/SNES_memory_map#Interrupt_vectors)
+  _padding3: u16,
   emu_abort: u16, // (0x97, 0xff)
-  emu_nmi: u16, // (0x9b, 0xff)
+  emu_nmi: u16,   // (0x9b, 0xff)
   emu_res: u16, // 0x98, 0xff [ Offset 0x8000  => 0x7f90 instead of ff90 International Superstar Soccer ]
-  emu_irq: u16, // (0x97, 0xff)
+  emu_irq: u16, // (0x97, 0xff) // NOTE: emu_brk is same as this
 }
 
 impl fmt::Debug for SnesHeader {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     // let mut bar = [0u8; 21];
     // let bar = [0x45, 0x4C];
-    // self.title.write_bytes_default_le(&mut bar);
+    // self.title.write_bytes_default_le(&mut bar);visualsation
 
     // let mut res_vec = [0x0, 0x0];
 

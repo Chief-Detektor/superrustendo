@@ -1,4 +1,5 @@
 use super::constants::*;
+use super::decoder::Opcodes;
 use super::instructions::*;
 use super::Registers;
 use super::CPU;
@@ -91,6 +92,45 @@ impl AddressModes {
       AddressModes::StackRelativeIndirectIndexedY => 2,
       AddressModes::Unknown => 2,
     }
+  }
+
+  pub fn get_effective_address(&self, cpu: &mut CPU, payload: &Vec<u8>, opcode: &Opcodes) -> usize {
+    match &self {
+      AddressModes::Absolute => {
+        let mut bank = 0;
+        if *opcode == Opcodes::JMP || *opcode == Opcodes::JSR {
+          println!("Transfer control");
+          bank = cpu.regs.PBR;
+        } else {
+          println!("Datamove");
+          bank = cpu.regs.DBR;
+        }
+
+        let data = payload.as_slice();
+        println!("### Data, yo: {:?} Bank: {:x}", data, bank);
+
+        return ((bank as usize) << 16 | (data[1] as usize) << 8 | data[0] as usize) as usize;
+      }
+      AddressModes::AbsoluteIndexedX => {
+        unimplemented!();
+        // let data = payload.as_slice();
+
+        // let mut number = (cpu.regs.DBR as u32) << 16 | (data[1] as u32) << 8 | data[0] as u32;
+
+        // if !cpu.e && cpu.regs.P.x == 0 {
+        //   // 16Bit
+        //   // TODO: byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le
+        //   number += cpu.regs.X as u16;
+        // } else {
+        //   // 8Bit
+        //   number += cpu.regs.X.low as u32;
+        // }
+        // return number as usize;
+      }
+      AddressModes::Implied => println!("Implied addressing"),
+      _ => unimplemented!("AddressMode: {:?}", self),
+    }
+    0
   }
 }
 

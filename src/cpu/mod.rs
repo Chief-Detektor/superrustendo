@@ -4,6 +4,7 @@ use std::fmt;
 
 pub mod addressmodes;
 pub mod constants;
+pub mod decoder;
 pub mod instructions;
 
 // #[derive(Debug)]
