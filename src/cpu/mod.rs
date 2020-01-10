@@ -1,5 +1,6 @@
 use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByteOrder};
 
+use std::convert::From;
 use std::fmt;
 
 pub mod addressmodes;
@@ -7,11 +8,9 @@ pub mod constants;
 pub mod decoder;
 pub mod instructions;
 
-// #[derive(Debug)]
-
 // in emulation mode $100 to $1FF
 pub struct Stack {
-  content: [u8; 0xffff - 1],
+  content: [u8; 0xffff],
   // constents: Vec<u8>,
 }
 
@@ -24,13 +23,13 @@ impl fmt::Debug for Stack {
 impl Default for Stack {
   fn default() -> Stack {
     Stack {
-      content: [0; 0xffff - 1],
+      content: [0; 0xffff],
     }
   }
 }
 
 bitfields!(
-  #[derive(PartialEq)]
+  #[derive(PartialEq, Copy, Clone)]
   pub StatusRegister: u8 {
       c: 1, // CarryBit / Emulation Mode
       z: 1, // Result Zero
@@ -53,6 +52,100 @@ impl fmt::Debug for StatusRegister {
     )
   }
 }
+
+// Conversion helper functions
+// TODO: From u8 and u16 to IndexRegister and vice versa
+impl From<StatusRegister> for u8 {
+  fn from(p: StatusRegister) -> Self {
+    let mut number = [0];
+    p.write_bytes_default_le(&mut number);
+    // return (number[1] as u16) << 8 | number[0] as u16;
+    return number[0];
+  }
+}
+
+impl From<u8> for StatusRegister {
+  fn from(byte: u8) -> Self {
+    byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[byte])
+  }
+}
+
+impl From<u8> for IndexRegister {
+  fn from(number: u8) -> Self {
+    let high = 0x0;
+    let low = number;
+    byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[low, high])
+  }
+}
+
+impl From<IndexRegister> for u16 {
+  fn from(register: IndexRegister) -> Self {
+    let mut number = [0; 2];
+    register.write_bytes_default_le(&mut number);
+    return (number[1] as u16) << 8 | number[0] as u16;
+  }
+}
+
+impl From<u16> for IndexRegister {
+  fn from(number: u16) -> Self {
+    let high = (number >> 8) as u8;
+    let low = (number & 0xff) as u8;
+    byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[low, high])
+  }
+}
+
+impl From<Accumulator> for u16 {
+  fn from(register: Accumulator) -> Self {
+    let mut number = [0; 2];
+    register.write_bytes_default_le(&mut number);
+    return (number[1] as u16) << 8 | number[0] as u16;
+  }
+}
+
+impl From<u16> for Accumulator {
+  fn from(number: u16) -> Self {
+    let high = (number >> 8) as u8;
+    let low = (number & 0xff) as u8;
+    byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[low, high])
+  }
+}
+
+// impl From<StatusRegister> for u8 {
+//   fn from(p: IndexRegister) -> Self {
+//     let mut number = [0];
+//     p.write_bytes_default_le(&mut number);
+//     // return (number[1] as u16) << 8 | number[0] as u16;
+//     return number[0];
+//   }
+// }
+
+// impl From<u8> for IndexRegister {
+//   fn from(byte: u8) -> Self {
+//     let reg = IndexRegister::default();
+//     reg = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[byte])
+//     return reg;
+//   }
+// }
+
+// TODO: implement this
+// impl From<IndexRegister> for u16 {
+//   fn from(p: IndexRegister) -> Self {
+//     let mut number = [0];
+//     p.write_bytes_default_le(&mut number);
+//     // return (number[1] as u16) << 8 | number[0] as u16;
+//     return number[0];
+//   }
+// }
+
+// // TODO: Implement this
+// impl From<u8> for IndexRegister {
+//   fn from(number: u16) -> Self {
+//     let reg = Index::default();
+
+//     byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[byte])
+//     // StatusRegister
+//   }
+// }
 
 impl Default for StatusRegister {
   fn default() -> StatusRegister {
@@ -90,7 +183,7 @@ impl Default for Accumulator {
 }
 
 bitfields!(
-  #[derive(PartialEq, Debug)]
+  #[derive(PartialEq, Debug, Copy, Clone)]
   pub IndexRegister: u16 {
     low: 8,
     high: 8
@@ -142,7 +235,7 @@ impl Default for Registers {
       X: IndexRegister::default(),
       Y: IndexRegister::default(),
       D: 0,
-      S: IndexRegister::new(),
+      S: byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[0xff, 0xf2]),
       PBR: 0,
       DBR: 0,
       PC: 0,
@@ -159,19 +252,29 @@ impl CPU {
     }
   }
 
-  // This looks horrible..
-  // TODO: helper functions to deal with byte_struct to u16 and back
-  // pub fn stack_push(&mut self, data: u8) {
-  //   // decrease stack pointer
-  //   let mut stack_pointer = [0x0, 0x0];
-  //   self.regs.S.write_bytes_default_le(&mut stack_pointer);
-  //   let mut foo = (stack_pointer[1] as u16) << 8 | stack_pointer[0] as u16;
-  //   foo += 1;
-  //   self.regs.S = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&foo);
+  pub fn stack_push(&mut self, payload: u8) {
+    let index = <u16>::from(self.regs.S);
+    // let index = 0xffff as u16;
+    // println!(
+    //   "=> Stack push {:} pos: {:x}, S: {:?}",
+    //   payload, index, self.regs.S
+    // );
+    self.stack.content[(index - 1) as usize] = payload;
+    self.regs.S = IndexRegister::from(index - 1);
+  }
 
-  //   self.stack.content[stack_pointer[0] as usize | (stack_pointer[1] as usize) << 8] = data;
-  // }
+  pub fn stack_pull(&mut self) -> u8 {
+    let index = <u16>::from(self.regs.S);
+    let ret = self.stack.content[index as usize];
+    // println!("<= Stack pull {:} pos: {:x}", ret, index);
+    self.regs.S = IndexRegister::from(index + 1);
+    ret
+  }
 
+  // pub fn pull(&mut self) -> u8 {
+  //   let ret = self.content[self.sp];
+  //   self.sp += 1;
+  //   ret
   // pub fn stack_pull(&mut self) -> u8 {
   //   // increase stack pointer
   //   let mut stack_pointer = [0x0, 0x0];

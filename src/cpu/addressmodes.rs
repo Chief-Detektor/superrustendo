@@ -3,8 +3,9 @@ use super::decoder::Opcodes;
 use super::instructions::*;
 use super::Registers;
 use super::CPU;
+use crate::mem::Mapper;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum AddressModes {
   Absolute,
   AbsoluteIndexedIndirect,
@@ -128,7 +129,13 @@ impl AddressModes {
         // return number as usize;
       }
       AddressModes::Implied => println!("Implied addressing"),
-      _ => unimplemented!("AddressMode: {:?}", self),
+      AddressModes::Immediate => println!("Immediate addressing"),
+      _ => unimplemented!(
+        "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
+        self,
+        opcode,
+        cpu.regs
+      ),
     }
     0
   }

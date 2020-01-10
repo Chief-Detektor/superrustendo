@@ -1,12 +1,11 @@
 use crate::addressmodes::{
   get_gi_addr_mode, get_gii_addr_mode, get_gii_reg_load_addr_mode, AddressModes,
 };
-use crate::cartridge::Cartridge;
-use crate::constants::*;
+
 use crate::decoder::Opcodes;
-use crate::Registers;
+use crate::mem::Mapper;
 use crate::CPU;
-use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByteOrder};
+use crate::{Accumulator, IndexRegister, Registers, StatusRegister};
 use std::convert::TryInto;
 
 #[derive(Debug, Default, Clone)]
@@ -21,7 +20,8 @@ pub struct Instruction {
 }
 
 impl Instruction {
-  pub fn execute(&mut self, mut cpu: &mut CPU, cartridge: &Cartridge) {
+  pub fn execute(&mut self, mut cpu: &mut CPU, mapper: &Mapper) {
+    println!("Payload beginning: {:?}", self.payload);
     // Get the correct address for instruction
     let effective_address =
       self
@@ -46,23 +46,30 @@ impl Instruction {
         cpu.e = cpu.regs.P.c != 0;
         cpu.regs.P.c = temp as _;
       }
+      Opcodes::SEP => {
+        // Set Status Bits
+        let tmp = <u8>::from(cpu.regs.P);
+        let next = tmp | self.payload[0]; // Set bits
+        cpu.regs.P = StatusRegister::from(next);
+      }
       Opcodes::REP => {
-        // cpu.regs.P.x = 1;
-        // println!("REP before {:?}", cpu.regs.P);
-        // println!("Payload: {:b}", self.payload[0]);
-        let mut next = [0x00];
-        // byte_struct::ByteStructUnspecifiedByteOrder::write_bytes_default_le(&cpu.regs.P, &mut next);
-        cpu.regs.P.write_bytes_default_le(&mut next);
-        let foo = next[0] & !self.payload[0]; // Clear bits
-        cpu.regs.P = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[foo]);
-        // println!("REP1: {:?}", cpu.regs);
-        // println!("REP after {:?}", cpu.regs.P);
+        // Reset Status Bits
+        let tmp = <u8>::from(cpu.regs.P);
+        let next = tmp & !self.payload[0]; // Clear bits
+        cpu.regs.P = StatusRegister::from(next);
       }
       Opcodes::LDX => {
         if cpu.regs.P.x != 1 {
+          println!("Payload beginning: {:?}", self.payload);
           let load_address = self.payload[1] as u16 | (self.payload[0] as u16) << 8;
 
-          let val = cartridge.read_u16(load_address.try_into().unwrap());
+          let mut val = 0;
+          if self.address_mode == AddressModes::Immediate {
+            val = load_address;
+          } else {
+            val = mapper.cartridge.read_u16(load_address.try_into().unwrap());
+          }
+          // let val = 0xfade as u16;
 
           // Set cpu flags accordingly
           if val == 0 {
@@ -77,15 +84,20 @@ impl Instruction {
             cpu.regs.P.n = 0;
           }
 
-          // TODO: Verify if this is correct
-          cpu.regs.X = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[
-            (val >> 8) as u8,
-            (val & 0xff00) as u8,
-          ]);
+          cpu.regs.X = IndexRegister::from(val);
+          println!(
+            "LDX: {:?}, REGS: {:?}, payload: {:?}",
+            val, cpu.regs, self.payload
+          );
         } else {
           let load_address = self.payload[0];
-          let val = cartridge.read_byte(load_address.try_into().unwrap());
 
+          let mut val = 0;
+          if self.address_mode == AddressModes::Immediate {
+            val = load_address;
+          } else {
+            val = mapper.cartridge.read_byte(load_address.try_into().unwrap());
+          }
           // Set cpu flags accordingly
           if val == 0 {
             cpu.regs.P.z = 1;
@@ -98,11 +110,8 @@ impl Instruction {
           } else {
             cpu.regs.P.n = 0;
           }
-
-          // cpu.regs.X.low = val.into();
-
-          cpu.regs.X.low =
-            byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[val]);
+          cpu.regs.X = IndexRegister::from(val);
+          println!("LDX: {:?}", val);
         }
         // println!("{:?}", cpu.regs.C);
       }
@@ -121,6 +130,7 @@ impl Instruction {
           // println!("TXS native");
           if cpu.regs.P.x != 1 {
             // println!("16Bit index");
+            // println!("{:?} ", cpu.regs.X);
             cpu.regs.S.high = cpu.regs.X.high;
             cpu.regs.S.low = cpu.regs.X.low;
           } else {
@@ -139,16 +149,34 @@ impl Instruction {
         let pc_low = (cpu.regs.PC & 0x00ff) as u8;
         let pc_high = (cpu.regs.PC >> 8) as u8;
 
-        // cpu.stack_push(pc_high);
-        // cpu.stack_push(pc_low);
+        cpu.stack_push(pc_high);
+        cpu.stack_push(pc_low);
 
+        // TODO: Use MemMapper in order to resolve the to correct rom address
         let address =
-          ((cpu.regs.PBR as u32) << 16 | (self.payload[1] as u32) << 8 | self.payload[0] as u32)
-            - 0x8000;
+          ((cpu.regs.PBR as u32) << 16 | (self.payload[1] as u32) << 8 | self.payload[0] as u32);
         println!("Jump to: {:x}", address);
         // panic!("FUUUUUUU");
         cpu.regs.PC = address.try_into().unwrap();
         // println!("JSR CPU: {:?} ", cpu);
+      }
+      Opcodes::LDA => {
+        if cpu.regs.P.m != 1 {
+          println!("### 16 Bit accumulator");
+          let val = (self.payload[1] as u16) << 8 | self.payload[0] as u16;
+          cpu.regs.C = Accumulator::from(val);
+        } else {
+          println!("### 8 Bit accumulator");
+
+          let val = self.payload[0] as u16;
+          cpu.regs.C = Accumulator::from(val);
+        }
+        // let test = 0xFF00 as u16;
+        // let index = IndexRegister::from(test.clone());
+        // let bar = <u16>::from(index);
+
+        let foo = mapper.cartridge.read_byte(self.payload[0] as _);
+        println!("### Yo check da LDA, Bro: {:?}", foo);
       }
       // Opcodes::ORA => {
       //   if cpu.regs.P.m != 1 {
@@ -190,5 +218,3 @@ impl Instruction {
     );
   }
 }
-
-// impl std::fmt::LowerHex for std::vec::Vec<u8> {}

@@ -5,6 +5,7 @@ use crate::cpu::addressmodes::{
 };
 use crate::cpu::CPU;
 use crate::instructions::Instruction;
+use crate::mem::Mapper;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Opcodes {
@@ -453,23 +454,22 @@ pub fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
 
 #[derive(Debug)]
 pub struct Decoder<'t> {
-  fetching_instruction: bool,
   instructions: Vec<Instruction>,
-  cartridge: &'t mut Cartridge,
   cpu: &'t mut CPU,
+  mapper: &'t mut Mapper,
 }
 
 impl<'t> Decoder<'t> {
-  pub fn new(
-    cpu: &'t mut super::CPU,
-    cartridge: &'t mut crate::cartridge::Cartridge,
-  ) -> Decoder<'t> {
-    Decoder {
-      fetching_instruction: false,
+  pub fn new(cpu: &'t mut super::CPU, mapper: &'t mut Mapper) -> Decoder<'t> {
+    let mut decoder = Decoder {
       instructions: Vec::new(),
-      cartridge: cartridge,
       cpu: cpu,
-    }
+      mapper: mapper, // Mem Mapper?
+    };
+
+    decoder.cpu.regs.PC = decoder.mapper.cartridge.get_emu_reset_vector();
+
+    decoder
   }
 
   pub fn decode(&self, opcode: u8) -> Result<(Opcodes, AddressModes), &'static str> {
@@ -505,14 +505,24 @@ impl Iterator for Decoder<'_> {
 
   fn next(&mut self) -> Option<Instruction> {
     // Put this in seperate Function >>>
+    // let foo = self.mapper[self.cpu.regs.PC as _];
+    // println!("Mapper in decoder: {:x}", foo);
     let inst = self
-      .decode(self.cartridge.read_byte(self.cpu.regs.PC as _))
+      .decode(self.mapper[self.cpu.regs.PC as _])
+      // .decode(self.mapper.cartridge.read_byte(self.cpu.regs.PC as _))
       .unwrap();
 
-    let payload = self.cartridge.read_bytes(
-      (self.cpu.regs.PC + 1) as usize, // The payload starts 1 after opcode
-      inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
+    // let payload = self.mapper.cartridge.read_bytes(
+    //   (self.cpu.regs.PC + 1) as usize, // The payload starts 1 after opcode
+    //   inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
+    // );
+    // TODO: Fix this! Mapping should be applied in mapper...
+    let payload = self.mapper.cartridge.read_bytes(
+      (self.cpu.regs.PC + 1 - 0x8000) as usize, // The payload starts 1 after opcode
+      inst.1.len(&self.cpu.regs, &inst.0) - 1,  // substract the opcode from length
     );
+
+    println!("Decoder payload: {:?}", payload);
 
     let mut instr = Instruction::default();
     instr.address = self.cpu.regs.PC as _;
@@ -524,7 +534,7 @@ impl Iterator for Decoder<'_> {
     instr.payload = payload;
     // <<<
 
-    instr.execute(&mut self.cpu, &self.cartridge);
+    instr.execute(&mut self.cpu, &self.mapper);
 
     // println!("{:?}, {:x}, {:?}", inst, self.cpu.regs.PC, payload);
     // None

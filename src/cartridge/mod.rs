@@ -43,7 +43,7 @@ impl MakeupType {
 }
 
 // TODO: Use byte_struct here and also padding
-#[derive(ByteStruct)]
+#[derive(ByteStruct, Copy, Clone, Default)]
 #[byte_struct_le]
 pub struct SnesHeader {
   title: [u8; 21],
@@ -70,22 +70,14 @@ pub struct SnesHeader {
   emu_cop: u16, // (0x97, 0xff)
   // emu_brk: u16, // (0x97, 0xff) // fixed here: this is wrong at this side (https://en.wikibooks.org/wiki/Super_NES_Programming/SNES_memory_map#Interrupt_vectors)
   _padding3: u16,
-  emu_abort: u16, // (0x97, 0xff)
-  emu_nmi: u16,   // (0x9b, 0xff)
-  emu_res: u16, // 0x98, 0xff [ Offset 0x8000  => 0x7f90 instead of ff90 International Superstar Soccer ]
-  emu_irq: u16, // (0x97, 0xff) // NOTE: emu_brk is same as this
+  emu_abort: u16,   // (0x97, 0xff)
+  emu_nmi: u16,     // (0x9b, 0xff)
+  pub emu_res: u16, // 0x98, 0xff [ Offset 0x8000  => 0x7f90 instead of ff90 International Superstar Soccer ]
+  emu_irq: u16,     // (0x97, 0xff) // NOTE: emu_brk is same as this
 }
 
 impl fmt::Debug for SnesHeader {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    // let mut bar = [0u8; 21];
-    // let bar = [0x45, 0x4C];
-    // self.title.write_bytes_default_le(&mut bar);visualsation
-
-    // let mut res_vec = [0x0, 0x0];
-
-    // self.emu_res.write_bytes_default_le(&mut res_vec);
-
     let makeup = MakeupType::from_byte(self.rom_makeup);
     // MakeupType::from_byte(0b00000000);
 
@@ -130,14 +122,17 @@ impl fmt::Debug for SnesHeader {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Cartridge {
-  rom: Vec<u8>,
-  pub header: Option<SnesHeader>,
+  pub rom: Vec<u8>,
+  pub header: SnesHeader,
   pub size: usize,
 }
 
 impl Cartridge {
+  pub fn get_emu_reset_vector(&self) -> u16 {
+    self.header.emu_res
+  }
   pub fn load_rom(path: &Path) -> Cartridge {
     let mut file = File::open(path).unwrap();
     let mut rom = Vec::new();
@@ -151,13 +146,13 @@ impl Cartridge {
     let mut card = Cartridge {
       rom,
       size,
-      header: None,
+      header: SnesHeader::default(),
     };
 
     if let Some(header) = card.load_header(hi_rom) {
-      card.header = Some(header);
+      card.header = header;
     } else if let Some(header) = card.load_header(low_rom) {
-      card.header = Some(header);
+      card.header = header;
     } else {
       println!("No header found");
     }
