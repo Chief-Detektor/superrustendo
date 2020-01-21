@@ -1,12 +1,12 @@
 pub mod wram;
 
 use crate::cartridge::Cartridge;
-use std::convert::TryInto;
+// use std::convert::TryInto;
 use std::ops::{Index, IndexMut};
 
 #[derive(Debug)]
 pub struct Mapper {
-  pub cartridge: Cartridge,
+  pub cartridge: Option<Cartridge>,
 }
 
 // impl Mapper {
@@ -30,7 +30,7 @@ impl Index<usize> for Mapper {
         println!("=> Access to ROM at 0x{:x}", address - 0x8000);
         // let ret = (address as u8) - 0x8000;
         // return &((self.cartridge.header.emu_res - 0x8000) as u8);
-        return &self.cartridge.rom[address - 0x8000];
+        return &self.cartridge.as_ref().unwrap().rom[address - 0x8000];
       }
       _ => {}
     }

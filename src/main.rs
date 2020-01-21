@@ -2,12 +2,11 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-mod cartridge;
-mod cpu;
-mod mem;
+pub mod cartridge;
+pub mod cpu;
+pub mod mem;
 
 use crate::cpu::decoder::*;
-use crate::cpu::instructions::*;
 use crate::cpu::*;
 use crate::mem::Mapper;
 
@@ -25,7 +24,9 @@ fn main() -> std::io::Result<()> {
 
   // TODO: Fix address offsets => rom mapping starts at 0x8000.. for bank 00
   // cpu.regs.PC = 0x4;
-  let mut mapper = Mapper { cartridge: card };
+  let mut mapper = Mapper {
+    cartridge: Some(card),
+  };
   // cpu.regs.PC = m[reset_vector as usize].into();
   // let test = m[reset_vector as usize] as u16;
 

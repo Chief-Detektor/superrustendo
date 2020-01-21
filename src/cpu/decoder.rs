@@ -1,10 +1,9 @@
-use crate::cartridge::Cartridge;
-use crate::constants::*;
 use crate::cpu::addressmodes::{
   get_gi_addr_mode, get_gii_addr_mode, get_gii_reg_load_addr_mode, AddressModes,
 };
+use crate::cpu::constants::*;
+use crate::cpu::instructions::Instruction;
 use crate::cpu::CPU;
-use crate::instructions::Instruction;
 use crate::mem::Mapper;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -440,6 +439,11 @@ pub fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
     }
     G1_OP_STA => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
+        // No immediate mode for STA
+        // match addr_mode {
+        //   AddressModes::Immediate => return None,
+        //   _ => {}
+        // };
         Some((Opcodes::STA, addr_mode))
       } else {
         None
@@ -467,11 +471,45 @@ impl<'t> Decoder<'t> {
       mapper: mapper, // Mem Mapper?
     };
 
-    decoder.cpu.regs.PC = decoder.mapper.cartridge.get_emu_reset_vector();
+    match decoder.mapper.cartridge {
+      Some(_) => {
+        decoder.cpu.regs.PC = decoder
+          .mapper
+          .cartridge
+          .as_ref()
+          .unwrap()
+          .get_emu_reset_vector();
+      }
+      None => {}
+    }
 
     decoder
   }
 
+  /// # Examples
+  ///
+  /// ```
+  /// use superrustendo::cpu::addressmodes::{
+  /// get_gi_addr_mode, get_gii_addr_mode, get_gii_reg_load_addr_mode, AddressModes,
+  /// };
+  ///
+  /// use superrustendo::cpu::decoder::Opcodes;
+  /// use superrustendo::cpu::decoder::Decoder;
+  /// use superrustendo::mem::Mapper;
+  /// use superrustendo::cpu::CPU;
+  /// use superrustendo::cpu::{Accumulator, IndexRegister, Registers, StatusRegister};
+  /// use std::convert::TryInto;
+  ///
+  /// let mut c = CPU::new();
+  /// let mut m = Mapper { cartridge: None };
+  /// let d = Decoder::new(&mut c, &mut m);
+  /// let result = d.decode(0x3d);
+  /// let res = result.unwrap();
+  /// let addr = res.1;
+  /// let op = res.0;
+  /// assert_eq!(op, Opcodes::AND);
+  /// assert_eq!(addr, AddressModes::AbsoluteIndexedX);
+  /// ```
   pub fn decode(&self, opcode: u8) -> Result<(Opcodes, AddressModes), &'static str> {
     // Group I decode
     if let Some(instr) = decode_group_III(opcode) {
@@ -517,7 +555,7 @@ impl Iterator for Decoder<'_> {
     //   inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
     // );
     // TODO: Fix this! Mapping should be applied in mapper...
-    let payload = self.mapper.cartridge.read_bytes(
+    let payload = self.mapper.cartridge.as_ref().unwrap().read_bytes(
       (self.cpu.regs.PC + 1 - 0x8000) as usize, // The payload starts 1 after opcode
       inst.1.len(&self.cpu.regs, &inst.0) - 1,  // substract the opcode from length
     );

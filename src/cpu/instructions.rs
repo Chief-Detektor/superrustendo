@@ -1,12 +1,17 @@
-use crate::addressmodes::{
-  get_gi_addr_mode, get_gii_addr_mode, get_gii_reg_load_addr_mode, AddressModes,
-};
-
-use crate::decoder::Opcodes;
+use crate::cpu::addressmodes::AddressModes;
+use crate::cpu::decoder::Opcodes;
+use crate::cpu::CPU;
+use crate::cpu::{Accumulator, IndexRegister, Registers, StatusRegister};
 use crate::mem::Mapper;
-use crate::CPU;
-use crate::{Accumulator, IndexRegister, Registers, StatusRegister};
+// use superrustendo::addressmodes::{
+//   get_gi_addr_mode, get_gii_addr_mode, get_gii_reg_load_addr_mode, AddressModes,
+// };
+
 use std::convert::TryInto;
+// use superrustendo::decoder::Opcodes;
+// use superrustendo::mem::Mapper;
+// use superrustendo::CPU;
+// use superrustendo::{Accumulator, IndexRegister, Registers, StatusRegister};
 
 #[derive(Debug, Default, Clone)]
 pub struct Instruction {
@@ -67,7 +72,11 @@ impl Instruction {
           if self.address_mode == AddressModes::Immediate {
             val = load_address;
           } else {
-            val = mapper.cartridge.read_u16(load_address.try_into().unwrap());
+            val = mapper
+              .cartridge
+              .as_ref()
+              .unwrap()
+              .read_u16(load_address.try_into().unwrap());
           }
           // let val = 0xfade as u16;
 
@@ -96,7 +105,11 @@ impl Instruction {
           if self.address_mode == AddressModes::Immediate {
             val = load_address;
           } else {
-            val = mapper.cartridge.read_byte(load_address.try_into().unwrap());
+            val = mapper
+              .cartridge
+              .as_ref()
+              .unwrap()
+              .read_byte(load_address.try_into().unwrap());
           }
           // Set cpu flags accordingly
           if val == 0 {
@@ -175,7 +188,11 @@ impl Instruction {
         // let index = IndexRegister::from(test.clone());
         // let bar = <u16>::from(index);
 
-        let foo = mapper.cartridge.read_byte(self.payload[0] as _);
+        let foo = mapper
+          .cartridge
+          .as_ref()
+          .unwrap()
+          .read_byte(self.payload[0] as _);
         println!("### Yo check da LDA, Bro: {:?}", foo);
       }
       // Opcodes::ORA => {
