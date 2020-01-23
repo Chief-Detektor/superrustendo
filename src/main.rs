@@ -22,10 +22,7 @@ fn main() -> std::io::Result<()> {
     ));
   }
 
-  let rom = &args[1];
-
-  // TODO: load rom via command line
-  let mut card = cartridge::Cartridge::load_rom(Path::new(rom));
+  let mut card = cartridge::Cartridge::load_rom(Path::new(&args[1]));
   println!("Loaded Cardidge: {:?}", card.header);
 
   let mut cpu = CPU::new();
