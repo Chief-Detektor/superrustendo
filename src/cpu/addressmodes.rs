@@ -8,6 +8,7 @@ use crate::mem::Mapper;
 #[derive(Debug, Clone, PartialEq)]
 pub enum AddressModes {
   Absolute,
+  AbsoluteIndirectLong,
   AbsoluteIndexedIndirect,
   AbsoluteIndexedX,
   AbsoluteIndexedY,
@@ -20,6 +21,7 @@ pub enum AddressModes {
   DirectPageIndexedIndirectX,
   DirectPageIndexedIndirectY,
   DirectPageIndexedX,
+  DirectPageIndexedY,
   DirectPageIndirect,
   DirectPageIndirectLong,
   DirectPageIndirectLongIndexedY,
@@ -46,6 +48,7 @@ impl AddressModes {
   pub fn len(&self, regs: &Registers, op: &Opcodes) -> usize {
     match self {
       AddressModes::Absolute => 3,
+      AddressModes::AbsoluteIndirectLong => 3,
       AddressModes::AbsoluteIndexedIndirect => 3,
       AddressModes::AbsoluteIndexedX => 3,
       AddressModes::AbsoluteIndexedY => 3,
@@ -58,6 +61,7 @@ impl AddressModes {
       AddressModes::DirectPageIndexedIndirectX => 2,
       AddressModes::DirectPageIndexedIndirectY => 2,
       AddressModes::DirectPageIndexedX => 2,
+      AddressModes::DirectPageIndexedY => 2,
       AddressModes::DirectPageIndirect => 2,
       AddressModes::DirectPageIndirectLong => 2,
       AddressModes::DirectPageIndirectLongIndexedY => 2,
@@ -149,12 +153,21 @@ impl Default for AddressModes {
 
 pub fn get_gii_reg_load_addr_mode(opcode: u8) -> Option<AddressModes> {
   let mask = opcode & GII_MASK;
+  let g2_mask = opcode & !GII_MASK;
   match mask {
     G2_REGLOAD_ADDR_MODE_IMMEDIATE => Some(AddressModes::Immediate),
-    G2_REGLOAD_ADDR_MODE_DIRECT_PAGE => Some(AddressModes::DirectPage),
     G2_REGLOAD_ADDR_MODE_ABSOLUTE => Some(AddressModes::Absolute),
-    G2_REGLOAD_ADDR_MODE_DIRECT_PAGE_INDEXED => Some(AddressModes::DirectPageIndexedX),
-    G2_REGLOAD_ADDR_MODE_ABSOLUTE_INDEXED => Some(AddressModes::AbsoluteIndexedX),
+    G2_REGLOAD_ADDR_MODE_DIRECT_PAGE => Some(AddressModes::DirectPage),
+    G2_REGLOAD_ADDR_MODE_DIRECT_PAGE_INDEXED => match g2_mask {
+      G2_OP_LDX => Some(AddressModes::DirectPageIndexedY),
+      G2_OP_LDY => Some(AddressModes::DirectPageIndexedX),
+      _ => None,
+    },
+    G2_REGLOAD_ADDR_MODE_ABSOLUTE_INDEXED => match g2_mask {
+      G2_OP_LDX => Some(AddressModes::AbsoluteIndexedY),
+      G2_OP_LDY => Some(AddressModes::AbsoluteIndexedX),
+      _ => None,
+    },
     _ => None,
   }
 }

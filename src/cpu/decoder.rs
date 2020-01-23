@@ -33,7 +33,7 @@ pub enum Opcodes {
   TSB,
   PHP,
   PHD,
-  BLP,
+  BPL,
   TRB,
   CLC,
   TCS,
@@ -161,17 +161,17 @@ pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
       0x5c => return Some((Opcodes::JMP, AddressModes::AbsoluteLong)),
       0x6c => return Some((Opcodes::JMP, AddressModes::AbsoluteIndirect)),
       0x7c => return Some((Opcodes::JMP, AddressModes::AbsoluteIndexedIndirect)),
-      0xdc => return Some((Opcodes::JMP, AddressModes::Immediate)), // bytes length can be 3 if m = 0 (16 bit accumulator)
+      0xdc => return Some((Opcodes::JMP, AddressModes::AbsoluteIndirectLong)), // bytes length can be 3 if m = 0 (16 bit accumulator)
       _ => {}
     },
     _ => {}
   }
   match opcode | G3_OP_STZ {
     G3_OP_STZ => match opcode {
-      0x64 => return Some((Opcodes::STZ, AddressModes::DirectPage)),
-      0x74 => return Some((Opcodes::STZ, AddressModes::DirectPageIndexedIndirectX)), // TODO: check address modes
       0x9c => return Some((Opcodes::STZ, AddressModes::Absolute)),
-      0x9e => return Some((Opcodes::STZ, AddressModes::AbsoluteIndexedIndirect)),
+      0x64 => return Some((Opcodes::STZ, AddressModes::DirectPage)),
+      0x9e => return Some((Opcodes::STZ, AddressModes::AbsoluteIndexedX)),
+      0x74 => return Some((Opcodes::STZ, AddressModes::DirectPageIndexedX)),
       _ => {}
     },
     _ => {}
@@ -206,7 +206,7 @@ pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
     G3_OP_COP => Some((Opcodes::COP, AddressModes::StackInterrupt)),
     G3_OP_PHP => Some((Opcodes::PHP, AddressModes::StackPush)),
     G3_OP_PHD => Some((Opcodes::PHD, AddressModes::StackPush)),
-    G3_OP_BLP => Some((Opcodes::BLP, AddressModes::ProgrammCounterRelative)),
+    G3_OP_BPL => Some((Opcodes::BPL, AddressModes::ProgrammCounterRelative)),
     G3_OP_CLC => Some((Opcodes::CLC, AddressModes::Implied)),
     G3_OP_TCS => Some((Opcodes::TCS, AddressModes::Implied)),
     G3_OP_PLP => Some((Opcodes::PLP, AddressModes::StackPull)),

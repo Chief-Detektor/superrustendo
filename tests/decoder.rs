@@ -777,4 +777,369 @@ mod tests {
   fn tsb_2() {
     opcode_test!(0x4, Opcodes::TSB, AddressModes::DirectPage);
   }
+  #[test]
+  fn bcc() {
+    opcode_test!(0x90, Opcodes::BCC, AddressModes::ProgrammCounterRelative);
+  }
+  #[test]
+  fn bcs() {
+    opcode_test!(0xb0, Opcodes::BCS, AddressModes::ProgrammCounterRelative);
+  }
+  #[test]
+  fn beq() {
+    opcode_test!(0xf0, Opcodes::BEQ, AddressModes::ProgrammCounterRelative);
+  }
+  #[test]
+  fn bit_1() {
+    opcode_test!(0x89, Opcodes::BIT, AddressModes::Immediate);
+  }
+  #[test]
+  fn bit_2() {
+    opcode_test!(0x2c, Opcodes::BIT, AddressModes::Absolute);
+  }
+  #[test]
+  fn bit_3() {
+    opcode_test!(0x24, Opcodes::BIT, AddressModes::DirectPage);
+  }
+  #[test]
+  fn bit_4() {
+    opcode_test!(0x3c, Opcodes::BIT, AddressModes::AbsoluteIndexedX);
+  }
+  #[test]
+  fn bit_5() {
+    opcode_test!(0x34, Opcodes::BIT, AddressModes::DirectPageIndexedX);
+  }
+  #[test]
+  fn bmi() {
+    opcode_test!(0x30, Opcodes::BMI, AddressModes::ProgrammCounterRelative);
+  }
+  #[test]
+  fn bne() {
+    opcode_test!(0xd0, Opcodes::BNE, AddressModes::ProgrammCounterRelative);
+  }
+  #[test]
+  fn bpl() {
+    opcode_test!(0x10, Opcodes::BPL, AddressModes::ProgrammCounterRelative);
+  }
+  #[test]
+  fn bra() {
+    opcode_test!(0x80, Opcodes::BRA, AddressModes::ProgrammCounterRelative);
+  }
+  #[test]
+  fn brl() {
+    opcode_test!(
+      0x82,
+      Opcodes::BRL,
+      AddressModes::ProgrammCounterRelativeLong
+    );
+  }
+  #[test]
+  fn bvc() {
+    opcode_test!(0x50, Opcodes::BVC, AddressModes::ProgrammCounterRelative);
+  }
+  #[test]
+  fn bvs() {
+    opcode_test!(0x70, Opcodes::BVS, AddressModes::ProgrammCounterRelative);
+  }
+  #[test]
+  fn clc() {
+    opcode_test!(0x18, Opcodes::CLC, AddressModes::Implied);
+  }
+  #[test]
+  fn cld() {
+    opcode_test!(0xd8, Opcodes::CLD, AddressModes::Implied);
+  }
+  #[test]
+  fn cli() {
+    opcode_test!(0x58, Opcodes::CLI, AddressModes::Implied);
+  }
+  #[test]
+  fn clv() {
+    opcode_test!(0xb8, Opcodes::CLV, AddressModes::Implied);
+  }
+  #[test]
+  fn cop() {
+    opcode_test!(0x2, Opcodes::COP, AddressModes::StackInterrupt);
+  }
+  #[test]
+  fn dex() {
+    opcode_test!(0xca, Opcodes::DEX, AddressModes::Implied);
+  }
+  #[test]
+  fn dey() {
+    opcode_test!(0x88, Opcodes::DEY, AddressModes::Implied);
+  }
+  #[test]
+  fn inx() {
+    opcode_test!(0xe8, Opcodes::INX, AddressModes::Implied);
+  }
+  #[test]
+  fn iny() {
+    opcode_test!(0xc8, Opcodes::INY, AddressModes::Implied);
+  }
+
+  #[test]
+  fn jmp_1() {
+    opcode_test!(0x4c, Opcodes::JMP, AddressModes::Absolute);
+  }
+  #[test]
+  fn jmp_2() {
+    opcode_test!(0x6c, Opcodes::JMP, AddressModes::AbsoluteIndirect);
+  }
+  #[test]
+  fn jmp_3() {
+    opcode_test!(0x7c, Opcodes::JMP, AddressModes::AbsoluteIndexedIndirect);
+  }
+  #[test]
+  fn jmp_4() {
+    opcode_test!(0x5c, Opcodes::JMP, AddressModes::AbsoluteLong);
+  }
+  #[test]
+  fn jmp_5() {
+    opcode_test!(0xdc, Opcodes::JMP, AddressModes::AbsoluteIndirectLong);
+  }
+  #[test]
+  fn jsr_1() {
+    opcode_test!(0x20, Opcodes::JSR, AddressModes::Absolute);
+  }
+  #[test]
+  fn jsr_2() {
+    opcode_test!(0xFC, Opcodes::JSR, AddressModes::AbsoluteIndexedIndirect);
+  }
+  #[test]
+  fn jsr_3() {
+    opcode_test!(0x22, Opcodes::JSR, AddressModes::AbsoluteLong);
+  }
+  #[test]
+  fn ldx_1() {
+    opcode_test!(0xa2, Opcodes::LDX, AddressModes::Immediate);
+  }
+  #[test]
+  fn ldx_2() {
+    opcode_test!(0xae, Opcodes::LDX, AddressModes::Absolute);
+  }
+  #[test]
+  fn ldx_3() {
+    opcode_test!(0xa6, Opcodes::LDX, AddressModes::DirectPage);
+  }
+  #[test]
+  fn ldx_4() {
+    opcode_test!(0xbe, Opcodes::LDX, AddressModes::AbsoluteIndexedY);
+  }
+  #[test]
+  fn ldx_5() {
+    opcode_test!(0xb6, Opcodes::LDX, AddressModes::DirectPageIndexedY);
+  }
+  #[test]
+  fn ldy_1() {
+    opcode_test!(0xa0, Opcodes::LDY, AddressModes::Immediate);
+  }
+  #[test]
+  fn ldy_2() {
+    opcode_test!(0xac, Opcodes::LDY, AddressModes::Absolute);
+  }
+  #[test]
+  fn ldy_3() {
+    opcode_test!(0xa4, Opcodes::LDY, AddressModes::DirectPage);
+  }
+  #[test]
+  fn ldy_4() {
+    opcode_test!(0xbc, Opcodes::LDY, AddressModes::AbsoluteIndexedX);
+  }
+  #[test]
+  fn ldy_5() {
+    opcode_test!(0xb4, Opcodes::LDY, AddressModes::DirectPageIndexedX);
+  }
+  #[test]
+  fn mvn() {
+    opcode_test!(0x54, Opcodes::MVN, AddressModes::BlockMove);
+  }
+  #[test]
+  fn mvp() {
+    opcode_test!(0x44, Opcodes::MVP, AddressModes::BlockMove);
+  }
+  #[test]
+  fn nop() {
+    opcode_test!(0xea, Opcodes::NOP, AddressModes::Implied);
+  }
+  #[test]
+  fn pea() {
+    opcode_test!(0xf4, Opcodes::PEA, AddressModes::StackAbsolute);
+  }
+  #[test]
+  fn pei() {
+    opcode_test!(0xd4, Opcodes::PEI, AddressModes::StackDirectPageIndirect);
+  }
+  #[test]
+  fn per() {
+    opcode_test!(0x62, Opcodes::PER, AddressModes::StackPCRelativeLong);
+  }
+  #[test]
+  fn pha() {
+    opcode_test!(0x48, Opcodes::PHA, AddressModes::StackPush);
+  }
+  #[test]
+  fn phb() {
+    opcode_test!(0x8b, Opcodes::PHB, AddressModes::StackPush);
+  }
+  #[test]
+  fn phd() {
+    opcode_test!(0x0b, Opcodes::PHD, AddressModes::StackPush);
+  }
+  #[test]
+  fn phk() {
+    opcode_test!(0x4b, Opcodes::PHK, AddressModes::StackPush);
+  }
+  #[test]
+  fn php() {
+    opcode_test!(0x08, Opcodes::PHP, AddressModes::StackPush);
+  }
+  #[test]
+  fn phx() {
+    opcode_test!(0xda, Opcodes::PHX, AddressModes::StackPush);
+  }
+  #[test]
+  fn phy() {
+    opcode_test!(0x5a, Opcodes::PHY, AddressModes::StackPush);
+  }
+  #[test]
+  fn pla() {
+    opcode_test!(0x68, Opcodes::PLA, AddressModes::StackPull);
+  }
+  #[test]
+  fn plb() {
+    opcode_test!(0xab, Opcodes::PLB, AddressModes::StackPull);
+  }
+  #[test]
+  fn pld() {
+    opcode_test!(0x2b, Opcodes::PLD, AddressModes::StackPull);
+  }
+  #[test]
+  fn plp() {
+    opcode_test!(0x28, Opcodes::PLP, AddressModes::StackPull);
+  }
+  #[test]
+  fn plx() {
+    opcode_test!(0xfa, Opcodes::PLX, AddressModes::StackPull);
+  }
+  #[test]
+  fn ply() {
+    opcode_test!(0x7a, Opcodes::PLY, AddressModes::StackPull);
+  }
+  #[test]
+  fn rep() {
+    opcode_test!(0xc2, Opcodes::REP, AddressModes::Immediate);
+  }
+  #[test]
+  fn rti() {
+    opcode_test!(0x40, Opcodes::RTI, AddressModes::StackRTI);
+  }
+  #[test]
+  fn rtl() {
+    opcode_test!(0x6b, Opcodes::RTL, AddressModes::StackRTL);
+  }
+  #[test]
+  fn rts() {
+    opcode_test!(0x60, Opcodes::RTS, AddressModes::StackRTS);
+  }
+  #[test]
+  fn sec() {
+    opcode_test!(0x38, Opcodes::SEC, AddressModes::Implied);
+  }
+  #[test]
+  fn sed() {
+    opcode_test!(0xf8, Opcodes::SED, AddressModes::Implied);
+  }
+  #[test]
+  fn sei() {
+    opcode_test!(0x78, Opcodes::SEI, AddressModes::Implied);
+  }
+  #[test]
+  fn sep() {
+    opcode_test!(0xe2, Opcodes::SEP, AddressModes::Immediate);
+  }
+  #[test]
+  fn stp() {
+    opcode_test!(0xdb, Opcodes::STP, AddressModes::Implied);
+  }
+  #[test]
+  fn stz_1() {
+    opcode_test!(0x9c, Opcodes::STZ, AddressModes::Absolute);
+  }
+  #[test]
+  fn stz_2() {
+    opcode_test!(0x64, Opcodes::STZ, AddressModes::DirectPage);
+  }
+  #[test]
+  fn stz_3() {
+    opcode_test!(0x9e, Opcodes::STZ, AddressModes::AbsoluteIndexedX);
+  }
+  #[test]
+  fn stz_4() {
+    opcode_test!(0x74, Opcodes::STZ, AddressModes::DirectPageIndexedX);
+  }
+  #[test]
+  fn tax() {
+    opcode_test!(0xaa, Opcodes::TAX, AddressModes::Implied);
+  }
+  #[test]
+  fn tay() {
+    opcode_test!(0xa8, Opcodes::TAY, AddressModes::Implied);
+  }
+  #[test]
+  fn tcd() {
+    opcode_test!(0x5b, Opcodes::TCD, AddressModes::Implied);
+  }
+  #[test]
+  fn tcs() {
+    opcode_test!(0x1b, Opcodes::TCS, AddressModes::Implied);
+  }
+  #[test]
+  fn tdc() {
+    opcode_test!(0x7b, Opcodes::TDC, AddressModes::Implied);
+  }
+  #[test]
+  fn tsc() {
+    opcode_test!(0x3b, Opcodes::TSC, AddressModes::Implied);
+  }
+  #[test]
+  fn tsx() {
+    opcode_test!(0xba, Opcodes::TSX, AddressModes::Implied);
+  }
+  #[test]
+  fn txa() {
+    opcode_test!(0x8a, Opcodes::TXA, AddressModes::Implied);
+  }
+  #[test]
+  fn txs() {
+    opcode_test!(0x9a, Opcodes::TXS, AddressModes::Implied);
+  }
+  #[test]
+  fn txy() {
+    opcode_test!(0x9b, Opcodes::TXY, AddressModes::Implied);
+  }
+  #[test]
+  fn tya() {
+    opcode_test!(0x98, Opcodes::TYA, AddressModes::Implied);
+  }
+  #[test]
+  fn tyx() {
+    opcode_test!(0xbb, Opcodes::TYX, AddressModes::Implied);
+  }
+  #[test]
+  fn wai() {
+    opcode_test!(0xcb, Opcodes::WAI, AddressModes::Implied);
+  }
+  #[test]
+  fn wdm() {
+    opcode_test!(0x42, Opcodes::WDM, AddressModes::Unknown);
+  }
+  #[test]
+  fn xba() {
+    opcode_test!(0xeb, Opcodes::XBA, AddressModes::Implied);
+  }
+  #[test]
+  fn xce() {
+    opcode_test!(0xfb, Opcodes::XCE, AddressModes::Implied);
+  }
 }
