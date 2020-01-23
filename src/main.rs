@@ -1,5 +1,7 @@
+use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::io::{Error, ErrorKind};
 use std::path::Path;
 
 pub mod cartridge;
@@ -11,13 +13,20 @@ use crate::cpu::*;
 use crate::mem::Mapper;
 
 fn main() -> std::io::Result<()> {
+  let args: Vec<String> = env::args().collect();
+
+  if args.len() < 2 {
+    return Err(Error::new(
+      ErrorKind::Other,
+      "Please specify an sfc rom file",
+    ));
+  }
+
+  let rom = &args[1];
+
   // TODO: load rom via command line
-  let mut card = cartridge::Cartridge::load_rom(Path::new("elix-nu-pal.sfc"));
+  let mut card = cartridge::Cartridge::load_rom(Path::new(rom));
   println!("Loaded Cardidge: {:?}", card.header);
-
-  // let mut reset_vector = card.read_u16(0xgffc);
-
-  // println!("reset vector: {:x}", reset_vector);
 
   let mut cpu = CPU::new();
 
@@ -26,12 +35,6 @@ fn main() -> std::io::Result<()> {
   let mut mapper = Mapper {
     cartridge: Some(card),
   };
-  // cpu.regs.PC = m[reset_vector as usize].into();
-  // let test = m[reset_vector as usize] as u16;
-
-  // cpu.regs.PC = m[reset_vector as usize] as u16;
-
-  // println!("TEST: {:x}", test);
 
   let mut decoder = Decoder::new(&mut cpu, &mut mapper);
 
