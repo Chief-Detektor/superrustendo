@@ -85,7 +85,7 @@ coverage:cargo:
   script:
     - "RUSTFLAGS='-C link-dead-code' cargo test --no-run"
     - kcov --exclude-pattern=/.cargo/,/usr/lib --verify target/cov `ls target/debug/decoder-* | head -n1`
-    - find target/cov -xtype l -delete
+    # - find target/cov -xtype l -delete
     - echo `./show_coverage.sh`
   cache:
     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
