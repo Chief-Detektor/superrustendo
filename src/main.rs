@@ -13,12 +13,11 @@ use crate::mem::Mapper;
 fn main() -> std::io::Result<()> {
   // TODO: load rom via command line
   let mut card = cartridge::Cartridge::load_rom(Path::new("elix-nu-pal.sfc"));
-
   println!("Loaded Cardidge: {:?}", card.header);
 
-  let mut reset_vector = card.read_u16(0x7ffc);
+  // let mut reset_vector = card.read_u16(0xgffc);
 
-  println!("reset vector: {:x}", reset_vector);
+  // println!("reset vector: {:x}", reset_vector);
 
   let mut cpu = CPU::new();
 

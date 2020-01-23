@@ -13,6 +13,9 @@ const SMC_OFFSET: usize = 0x200;
 #[derive(Debug)]
 struct FastRom(bool);
 
+// TODO: Once we know what rom type it is (hi rom, low rom) get if fastrom etc from header
+
+// TODO: This is crap.. I think
 #[derive(Debug)]
 enum MakeupType {
   HiRom(FastRom),
@@ -150,8 +153,10 @@ impl Cartridge {
     };
 
     if let Some(header) = card.load_header(hi_rom) {
+      println!("Hi Rom Detected");
       card.header = header;
     } else if let Some(header) = card.load_header(low_rom) {
+      println!("Low Rom Detected");
       card.header = header;
     } else {
       println!("No header found");
@@ -166,6 +171,18 @@ impl Cartridge {
     let raw = header.as_mut_slice();
     let snes_header = SnesHeader::read_bytes(&raw[..]);
 
+    // TODO: This looks awfull
+    let mut i = 0;
+    for b in &raw[..] {
+      i += 1;
+      if *b > 0x1f && *b <= 0x7f && i <= 21 {
+        println!("#====> Snes Title is all asci at: {}", i);
+      } else if i <= 21 {
+        println!("Error! {} is not ascii", *b);
+        return None;
+      }
+    }
+
     if raw_string::RawStr::from_bytes(&snes_header.title).is_ascii() {
       println!("String is ascii");
     } else {
@@ -178,7 +195,7 @@ impl Cartridge {
       return None;
     }
 
-    println!("{:?}", raw);
+    // println!("{:?}", raw);
 
     Some(snes_header)
   }
