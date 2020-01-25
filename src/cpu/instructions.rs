@@ -15,11 +15,11 @@ use std::convert::TryInto;
 
 #[derive(Debug, Default, Clone)]
 pub struct Instruction {
-  pub address: u32,
-  pub opcode: Opcodes,
-  pub address_mode: AddressModes,
+  pub(super) address: u32,
+  pub(super) opcode: Opcodes,
+  pub(super) address_mode: AddressModes,
   lenght: usize,
-  pub payload: Vec<u8>,
+  pub(super) payload: Vec<u8>,
   cycles: usize,
   // follow_jumps: bool,
 }

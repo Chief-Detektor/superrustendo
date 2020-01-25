@@ -110,7 +110,7 @@ impl Default for Opcodes {
   }
 }
 
-pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
+fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   // println!("Decode group III: {:X}, {:b}", opcode, G3_OP_TSB);
   // println!(
   //   "G III {:b}, {:b}, {:x}",
@@ -270,7 +270,7 @@ pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   // Some((Opcodes::BRK, AddressModes::StackInterrupt, 2))
 }
 
-pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
+fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   // let group_2_mask: u8 = !GII_MASK;
   // let group_2_mask4addr_mode: u8 = !GII_MASK_4_ADDR_MODES;
   let g2_mask = opcode & !GII_MASK;
@@ -382,7 +382,7 @@ pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   }
 }
 
-pub fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
+fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   let group_1_mask: u8 = !GI_MASK;
   let g1_mask = opcode & group_1_mask;
 
