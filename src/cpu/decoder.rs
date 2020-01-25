@@ -489,15 +489,11 @@ impl<'t> Decoder<'t> {
   /// # Examples
   ///
   /// ```
-  /// use superrustendo::cpu::addressmodes::{
-  /// get_gi_addr_mode, get_gii_addr_mode, get_gii_reg_load_addr_mode, AddressModes,
-  /// };
+  /// use superrustendo::cpu::addressmodes::AddressModes;
   ///
-  /// use superrustendo::cpu::decoder::Opcodes;
-  /// use superrustendo::cpu::decoder::Decoder;
+  /// use superrustendo::cpu::decoder::{ Decoder, Opcodes};
   /// use superrustendo::mem::Mapper;
-  /// use superrustendo::cpu::CPU;
-  /// use superrustendo::cpu::{Accumulator, IndexRegister, Registers, StatusRegister};
+  /// use superrustendo::cpu::{Accumulator, CPU, IndexRegister, Registers, StatusRegister};
   /// use std::convert::TryInto;
   ///
   /// let mut c = CPU::new();
