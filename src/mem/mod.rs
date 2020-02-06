@@ -1,6 +1,6 @@
 pub mod wram;
 
-use crate::cartridge::Cartridge;
+use crate::cartridge::{Cartridge, RomTypes};
 // use std::convert::TryInto;
 use std::ops::{Index, IndexMut};
 
@@ -27,10 +27,16 @@ impl Index<usize> for Mapper {
     match address {
       0x2100..=0x21ff => println!("=> Access to PPU1, APU, HW-Registers"),
       0x8000..=0xffff => {
-        println!("=> Access to ROM at 0x{:x}", address - 0x8000);
-        // let ret = (address as u8) - 0x8000;
-        // return &((self.cartridge.header.emu_res - 0x8000) as u8);
-        return &self.cartridge.as_ref().unwrap().rom[address - 0x8000];
+        if self.cartridge.as_ref().unwrap().rom_type == Some(RomTypes::LowRom) {
+          println!("=> Access to ROM at 0x{:x}", address - 0x8000);
+          // let ret = (address as u8) - 0x8000;
+          return &self.cartridge.as_ref().unwrap().rom[address - 0x8000];
+        } else {
+          println!("=> Access to ROM at 0x{:x}", address);
+          // let ret = (address as u8) - 0x8000;
+          // return &((self.cartridge.header.emu_res - 0x8000) as u8);
+          return &self.cartridge.as_ref().unwrap().rom[address];
+        }
       }
       _ => {}
     }

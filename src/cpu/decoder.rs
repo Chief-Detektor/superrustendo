@@ -1,3 +1,4 @@
+use crate::cartridge::RomTypes;
 use crate::cpu::addressmodes::{
   get_gi_addr_mode, get_gii_addr_mode, get_gii_reg_load_addr_mode, AddressModes,
 };

@@ -45,6 +45,12 @@ impl MakeupType {
   }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum RomTypes {
+  LowRom,
+  HiRom,
+}
+
 // TODO: Use byte_struct here and also padding
 #[derive(ByteStruct, Copy, Clone, Default)]
 #[byte_struct_le]
@@ -129,6 +135,7 @@ impl fmt::Debug for SnesHeader {
 pub struct Cartridge {
   pub rom: Vec<u8>,
   pub header: SnesHeader,
+  pub rom_type: Option<RomTypes>,
   pub size: usize,
 }
 
@@ -149,15 +156,18 @@ impl Cartridge {
     let mut card = Cartridge {
       rom,
       size,
+      rom_type: None,
       header: SnesHeader::default(),
     };
 
     if let Some(header) = card.load_header(hi_rom) {
       println!("Hi Rom Detected");
       card.header = header;
+      card.rom_type = Some(RomTypes::HiRom);
     } else if let Some(header) = card.load_header(low_rom) {
       println!("Low Rom Detected");
       card.header = header;
+      card.rom_type = Some(RomTypes::LowRom);
     } else {
       println!("No header found");
     }
