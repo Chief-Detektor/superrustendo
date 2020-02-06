@@ -4,6 +4,7 @@ use super::instructions::*;
 use super::Registers;
 use super::CPU;
 use crate::mem::Mapper;
+use std::convert::TryInto;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AddressModes {
@@ -132,15 +133,27 @@ impl AddressModes {
         // }
         // return number as usize;
       }
+      AddressModes::AbsoluteLong => {
+        let op_low = payload.as_slice();
+        // let op_high = payload[1];
+        // let op_bank = cpu.regs.DBR;
+        println!(
+          "### ABSOLUTE LONG: Bank: {:x} high: {:x} low: {:?}",
+          0, 0, op_low
+        );
+        return 0;
+      }
       AddressModes::Implied => println!("Implied addressing"),
       AddressModes::Immediate => println!("Immediate addressing"),
-      _ => unimplemented!(
-        "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
-        self,
-        opcode,
-        cpu.regs
-      ),
-    }
+      _ => {
+        // unimplemented!(
+        //   "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
+        //   self,
+        //   opcode,
+        //   cpu.regs
+        // );
+      }
+    };
     0
   }
 }

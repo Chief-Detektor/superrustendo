@@ -6,11 +6,13 @@ use std::fmt;
 pub mod addressmodes;
 pub mod constants;
 pub mod decoder;
+pub mod dissassembler;
 pub mod instructions;
 
 // in emulation mode $100 to $1FF
+#[derive(Copy, Clone)]
 pub struct Stack {
-  content: [u8; 0xffff],
+  content: [u8; 0x10000],
   // constents: Vec<u8>,
 }
 
@@ -23,7 +25,7 @@ impl fmt::Debug for Stack {
 impl Default for Stack {
   fn default() -> Stack {
     Stack {
-      content: [0; 0xffff],
+      content: [0; 0x10000],
     }
   }
 }
@@ -163,7 +165,7 @@ impl Default for StatusRegister {
 }
 
 bitfields!(
-  #[derive(PartialEq)]
+  #[derive(PartialEq, Copy, Clone)]
   pub Accumulator: u16 {
     pub A: 8,
     pub B: 8,
@@ -206,7 +208,7 @@ impl IndexRegister {
 }
 
 // TODO: Proper inital state
-#[derive(ByteStruct, PartialEq, Debug)]
+#[derive(ByteStruct, PartialEq, Debug, Clone, Copy)]
 #[byte_struct_le]
 pub struct Registers {
   P: StatusRegister,
@@ -254,20 +256,32 @@ impl CPU {
 
   pub fn stack_push(&mut self, payload: u8) {
     let index = <u16>::from(self.regs.S);
-    // let index = 0xffff as u16;
+    println!("Pushing {:x} to address {:x}", payload, index);
+
+    let mut new_index: i32 = index as i32 - 1;
+
+    if new_index == -1 {
+      new_index = 0xffff
+    }
+    self.stack.content[(new_index) as usize] = payload;
+    self.regs.S = IndexRegister::from(new_index as u16);
+    //let index = 0xffff as u16;
     // println!(
     //   "=> Stack push {:} pos: {:x}, S: {:?}",
     //   payload, index, self.regs.S
     // );
-    self.stack.content[(index - 1) as usize] = payload;
-    self.regs.S = IndexRegister::from(index - 1);
   }
 
   pub fn stack_pull(&mut self) -> u8 {
     let index = <u16>::from(self.regs.S);
     let ret = self.stack.content[index as usize];
+
+    let mut new_index: i32 = index as i32 + 1;
+    if new_index == 0x10000 {
+      new_index = 0;
+    }
     // println!("<= Stack pull {:} pos: {:x}", ret, index);
-    self.regs.S = IndexRegister::from(index + 1);
+    self.regs.S = IndexRegister::from(new_index as u16);
     ret
   }
 

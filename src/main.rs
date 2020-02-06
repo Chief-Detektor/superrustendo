@@ -1,14 +1,15 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
-
 pub mod cartridge;
 pub mod cpu;
 pub mod mem;
 
 use crate::cpu::decoder::*;
+use crate::cpu::dissassembler::PrintToken;
 use crate::cpu::*;
 use crate::mem::Mapper;
 
@@ -35,9 +36,42 @@ fn main() -> std::io::Result<()> {
 
   let mut decoder = Decoder::new(&mut cpu, &mut mapper);
 
-  for i in decoder {
-    // println!("{:?}", i);
-    i.print();
+  let mut labels = HashMap::new();
+  let mut decoded_asm = Vec::new();
+
+  for (i, instr) in decoder.enumerate() {
+    instr.print_info();
+    decoded_asm.push((instr.address, instr.print(&mut labels)));
+    if i == 40 {
+      break;
+    }
   }
+
+  println!();
+  println!("Dissassembled code:");
+
+  // for (address, line) in decoded_asm.iter_mut() {
+  //   if labels.contains_key(&(*address as usize)) {
+  //     let label = labels.get(&(*address as usize)).unwrap();
+  //     *line = format!("{}:\n {}", label, line);
+  //     // line = line + labels.get(&(*address as usize));
+  //   }
+  //   // Don't print, yet
+  //   // println!("{:#x}: {}", address, line);
+  // }
+
+  println!("Labels:");
+  for l in &labels {
+    println!("At {:x}: {}", l.0, l.1);
+  }
+
+  for (address, line) in decoded_asm {
+    if labels.contains_key(&(address as usize)) {
+      let label = labels.get(&(address as usize)).unwrap();
+      println!("{}:", label);
+    }
+    println!("\t{:#x}:\t{}", address, line);
+  }
+
   Ok(())
 }

@@ -460,8 +460,9 @@ fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
 #[derive(Debug)]
 pub struct Decoder<'t> {
   instructions: Vec<Instruction>,
-  cpu: &'t mut CPU,
+  pub(crate) cpu: &'t mut CPU,
   mapper: &'t mut Mapper,
+  follow_jumps: bool,
 }
 
 impl<'t> Decoder<'t> {
@@ -470,6 +471,7 @@ impl<'t> Decoder<'t> {
       instructions: Vec::new(),
       cpu: cpu,
       mapper: mapper, // Mem Mapper?
+      follow_jumps: true,
     };
 
     match decoder.mapper.cartridge {
@@ -552,14 +554,28 @@ impl Iterator for Decoder<'_> {
     //   inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
     // );
     // TODO: Fix this! Mapping should be applied in mapper...
-    let payload = self.mapper.cartridge.as_ref().unwrap().read_bytes(
-      (self.cpu.regs.PC + 1 - 0x8000) as usize, // The payload starts 1 after opcode
-      inst.1.len(&self.cpu.regs, &inst.0) - 1,  // substract the opcode from length
-    );
 
+    // let foo = |bank: u8| ->  u16 {
+    //   bank *
+    // }
+    // TODO: WHY IS THIS STILL NOT IN MAPPER????
+    let payload;
+    if self.mapper.cartridge.as_ref().unwrap().rom_type == Some(RomTypes::LowRom) {
+      payload = self.mapper.cartridge.as_ref().unwrap().read_bytes(
+        (self.cpu.regs.PC as u32 - 0x8000 + 1) as usize, // The payload starts 1 after opcode
+        // (((self.cpu.regs.DBR as u32) << 16) | self.cpu.regs.PC as u32 + 1) as usize, // The payload starts 1 after opcode
+        inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
+      );
+    } else {
+      payload = self.mapper.cartridge.as_ref().unwrap().read_bytes(
+        (self.cpu.regs.PC as u32 + 1) as usize, // The payload starts 1 after opcode
+        inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
+      );
+    }
     println!("Decoder payload: {:?}", payload);
+    // println!("Regs: {:?}", self.cpu.regs);
 
-    let mut instr = Instruction::default();
+    let mut instr = Instruction::new(self.follow_jumps);
     instr.address = self.cpu.regs.PC as _;
     // increase Programm Counter
     self.cpu.regs.PC += inst.1.len(&self.cpu.regs, &inst.0) as u16;

@@ -15,16 +15,22 @@ use std::convert::TryInto;
 
 #[derive(Debug, Default, Clone)]
 pub struct Instruction {
-  pub(super) address: u32,
+  pub(crate) address: u32,
   pub(super) opcode: Opcodes,
   pub(super) address_mode: AddressModes,
-  lenght: usize,
+  pub(crate) length: usize,
   pub(super) payload: Vec<u8>,
   cycles: usize,
-  // follow_jumps: bool,
+  follow_jumps: bool,
 }
 
 impl Instruction {
+  pub fn new(follow_jumps: bool) -> Instruction {
+    let mut inst = Instruction::default();
+    inst.follow_jumps = follow_jumps;
+    inst
+  }
+  // pub fn new(opcode: u8) -> Instruction {}
   pub fn execute(&mut self, mut cpu: &mut CPU, mapper: &Mapper) {
     println!("Payload beginning: {:?}", self.payload);
     // Get the correct address for instruction
@@ -38,6 +44,7 @@ impl Instruction {
       Opcodes::BRK => {
         cpu.regs.PC += 2;
       }
+      Opcodes::CLD => cpu.regs.P.d = 0,
       Opcodes::SEI => {
         cpu.regs.P.i = 1;
       }
@@ -63,6 +70,13 @@ impl Instruction {
         let next = tmp & !self.payload[0]; // Clear bits
         cpu.regs.P = StatusRegister::from(next);
       }
+      Opcodes::PEA => {
+        let low = self.payload[0];
+        let high = self.payload[1];
+        cpu.stack_push(high);
+        cpu.stack_push(low);
+      }
+      Opcodes::PHB => cpu.stack_push(cpu.regs.DBR),
       Opcodes::LDX => {
         if cpu.regs.P.x != 1 {
           println!("Payload beginning: {:?}", self.payload);
@@ -154,24 +168,47 @@ impl Instruction {
         }
         // println!("TXS: cpu {:?}", cpu.regs);
       }
+      Opcodes::JMP => {
+        // TODO: At long jumoing: Bank Mapping e.g. in HiRom is bank 80 - 9f  = 00 - 1f etc
+        //  also do this in AddressMode module
+        let address =
+            /*(cpu.regs.PBR as u32) << 16 | */ (self.payload[1] as u32) << 8 | self.payload[0] as u32;
+        // cpu.pc =
+        cpu.regs.PC = address.try_into().unwrap();
+        // } else {
+        // }
+      }
       // TODO: implement Stack
       Opcodes::JSR => {
-        // println!("Going to jump, yo!");
+        println!("Going to jump, yo!");
         // println!("JSR: CPU {:?}", cpu);
 
-        let pc_low = (cpu.regs.PC & 0x00ff) as u8;
-        let pc_high = (cpu.regs.PC >> 8) as u8;
+        if self.follow_jumps {
+          let pc_low = (cpu.regs.PC & 0x00ff) as u8;
+          let pc_high = (cpu.regs.PC >> 8) as u8;
 
-        cpu.stack_push(pc_high);
-        cpu.stack_push(pc_low);
+          cpu.stack_push(pc_high);
+          cpu.stack_push(pc_low);
 
-        // TODO: Use MemMapper in order to resolve the to correct rom address
-        let address =
-          ((cpu.regs.PBR as u32) << 16 | (self.payload[1] as u32) << 8 | self.payload[0] as u32);
-        println!("Jump to: {:x}", address);
-        // panic!("FUUUUUUU");
-        cpu.regs.PC = address.try_into().unwrap();
+          println!("### PAYLOAD{:?}", self.payload);
+
+          // TODO: Use MemMapper in order to resolve the to correct rom address
+          let address =
+            (cpu.regs.PBR as u32) << 16 | (self.payload[1] as u32) << 8 | self.payload[0] as u32;
+          println!("Jump to: {:x}", address);
+          // panic!("FUUUUUUU");
+          cpu.regs.PC = address.try_into().unwrap();
+        }
         // println!("JSR CPU: {:?} ", cpu);
+      }
+      Opcodes::RTS => {
+        let low = cpu.stack_pull();
+        let high = cpu.stack_pull();
+
+        let address = (cpu.regs.PBR as u32) << 16 | (high as u32) << 8 | low as u32;
+
+        println!("# Return to Subroutine {:x}", address);
+        cpu.regs.PC = address.try_into().unwrap();
       }
       Opcodes::LDA => {
         if cpu.regs.P.m != 1 {
@@ -194,6 +231,15 @@ impl Instruction {
           .unwrap()
           .read_byte(self.payload[0] as _);
         println!("### Yo check da LDA, Bro: {:?}", foo);
+      }
+      Opcodes::STA => {
+        println!("STA ====>{:?}", self.payload);
+        // mapper[address] = payload;
+        // if cpu.regs.P.m != 0 {
+        //   mapper
+        // } else {
+
+        // }
       }
       // Opcodes::ORA => {
       //   if cpu.regs.P.m != 1 {
@@ -218,17 +264,17 @@ impl Instruction {
       //   }
       // }
       _ => {
-        unimplemented!(
-          "{:?} {:?} payload: {:?}",
-          &self.opcode,
-          &self.address_mode,
-          &self.payload,
-        );
+        // unimplemented!(
+        //   "{:?} {:?} payload: {:?}",
+        //   &self.opcode,
+        //   &self.address_mode,
+        //   &self.payload,
+        // );
       }
     }
   }
 
-  pub fn print(&self) {
+  pub fn print_info(&self) {
     println!(
       "0x{:x}: {:?} {:?} {:?}",
       self.address, self.opcode, self.payload, self.address_mode
