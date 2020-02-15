@@ -222,8 +222,15 @@ impl Cartridge {
 
   pub fn read_bytes(&self, address: usize, length: usize) -> Vec<u8> {
     let mut ret = Vec::with_capacity(length);
-    for i in 0..length {
-      ret.push(self.read_byte(address + i));
+    if self.rom_type == Some(RomTypes::LowRom) {
+      for i in 0..length {
+        // Is this correct?
+        ret.push(self.read_byte((address ^ 0x8000) + i));
+      }
+    } else {
+      for i in 0..length {
+        ret.push(self.read_byte(address + i));
+      }
     }
     ret
   }
