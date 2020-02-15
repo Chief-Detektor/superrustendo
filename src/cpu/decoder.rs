@@ -547,47 +547,40 @@ impl Iterator for Decoder<'_> {
     // let foo = self.mapper[self.cpu.regs.PC as _];
     // println!("Mapper in decoder: {:x}", foo);
     let inst = self
-      .decode(self.mapper[self.cpu.regs.PC as _])
+      .decode(
+        self
+          .mapper
+          .read(self.cpu.regs.PC as usize)
+          .try_into()
+          .unwrap(),
+      )
       // .decode(self.mapper.cartridge.read_byte(self.cpu.regs.PC as _))
       .unwrap();
 
-    // let payload = self.mapper.cartridge.read_bytes(
-    //   (self.cpu.regs.PC + 1) as usize, // The payload starts 1 after opcode
-    //   inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
-    // );
-    // TODO: Fix this! Mapping should be applied in mapper...
-
-    // let foo = |bank: u8| ->  u16 {
-    //   bank *
+    let payload = self.mapper.cartridge.as_ref().unwrap().read_bytes(
+      (self.cpu.regs.PC as u32 + 1) as usize, // The payload starts 1 after opcode
+      inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
+    );
     // }
-    // TODO: WHY IS THIS STILL NOT IN MAPPER????
-    let payload;
-    if self.mapper.cartridge.as_ref().unwrap().rom_type == Some(RomTypes::LowRom) {
-      payload = self.mapper.cartridge.as_ref().unwrap().read_bytes(
-        (self.cpu.regs.PC as u32 - 0x8000 + 1) as usize, // The payload starts 1 after opcode
-        // (((self.cpu.regs.DBR as u32) << 16) | self.cpu.regs.PC as u32 + 1) as usize, // The payload starts 1 after opcode
-        inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
-      );
-    } else {
-      payload = self.mapper.cartridge.as_ref().unwrap().read_bytes(
-        (self.cpu.regs.PC as u32 + 1) as usize, // The payload starts 1 after opcode
-        inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
-      );
-    }
     println!("Decoder payload: {:?}", payload);
     // println!("Regs: {:?}", self.cpu.regs);
 
     let mut instr = Instruction::new(self.follow_jumps);
     instr.address = self.cpu.regs.PC as _;
+
+    // TODO: Handle Overflow
+
+    let mut new_pc = Wrapping(self.cpu.regs.PC);
     // increase Programm Counter
-    self.cpu.regs.PC += inst.1.len(&self.cpu.regs, &inst.0) as u16;
+    new_pc.0 += inst.1.len(&self.cpu.regs, &inst.0) as u16;
+    self.cpu.regs.PC = new_pc.0;
 
     instr.opcode = inst.0;
     instr.address_mode = inst.1;
     instr.payload = payload;
     // <<<
 
-    instr.execute(&mut self.cpu, &self.mapper);
+    instr.execute(&mut self.cpu, &mut self.mapper);
 
     // println!("{:?}, {:x}, {:?}", inst, self.cpu.regs.PC, payload);
     // None
