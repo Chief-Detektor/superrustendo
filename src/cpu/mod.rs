@@ -6,7 +6,6 @@ use std::fmt;
 pub mod addressmodes;
 pub mod constants;
 pub mod decoder;
-pub mod dissassembler;
 pub mod instructions;
 
 // in emulation mode $100 to $1FF
@@ -112,6 +111,37 @@ impl From<u16> for Accumulator {
   }
 }
 
+impl From<Accumulator> for usize {
+  fn from(register: Accumulator) -> Self {
+    let mut number = [0; 2];
+    register.write_bytes_default_le(&mut number);
+    return (number[1] as usize) << 8 | number[0] as usize;
+  }
+}
+
+impl From<usize> for Accumulator {
+  fn from(number: usize) -> Self {
+    let high = (number >> 8) as u8;
+    let low = (number & 0xff) as u8;
+    byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[low, high])
+  }
+}
+
+// impl From<u16> for usize {
+//   fn from(register: Accumulator) -> Self {
+//     let mut number = [0; 2];
+//     register.write_bytes_default_le(&mut number);
+//     return (number[1] as usize) << 8 | number[0] as usize;
+//   }
+// }
+
+// impl From<usize> for u16 {
+//   fn from(number: usize) -> Self {
+//     let high = (number >> 8) as u8;
+//     let low = (number & 0xff) as u8;
+//     byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[low, high])
+//   }
+// }
 // impl From<StatusRegister> for u8 {
 //   fn from(p: IndexRegister) -> Self {
 //     let mut number = [0];
@@ -154,10 +184,10 @@ impl Default for StatusRegister {
     StatusRegister {
       n: 0,
       v: 0,
-      m: 0,
-      x: 0,
+      m: 1,
+      x: 1,
       d: 0,
-      i: 0,
+      i: 1,
       z: 0,
       c: 0,
     }
@@ -217,8 +247,8 @@ pub struct Registers {
   Y: IndexRegister, // Y Index Register,
   D: u16,           // Direct Page Register
   S: IndexRegister, // Stack Pointer (or 24 bits?)
-  PBR: u8,          // Programm Bank Register
-  DBR: u8,          // Data Bank Register
+  pub PBR: u8,      // Programm Bank Register
+  pub DBR: u8,      // Data Bank Register
   pub PC: u16,      // Programm Counter
 }
 

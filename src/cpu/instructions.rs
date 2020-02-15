@@ -1,6 +1,7 @@
 use crate::cpu::addressmodes::AddressModes;
 use crate::cpu::decoder::Opcodes;
 use crate::cpu::CPU;
+// use crate::cpu::
 use crate::cpu::{Accumulator, IndexRegister, Registers, StatusRegister};
 use crate::mem::Mapper;
 // use superrustendo::addressmodes::{
@@ -15,11 +16,11 @@ use std::convert::TryInto;
 
 #[derive(Debug, Default, Clone)]
 pub struct Instruction {
-  pub(crate) address: u32,
-  pub(super) opcode: Opcodes,
-  pub(super) address_mode: AddressModes,
+  pub address: u32,
+  pub opcode: Opcodes,
+  pub(crate) address_mode: AddressModes,
   pub(crate) length: usize,
-  pub(super) payload: Vec<u8>,
+  pub(crate) payload: Vec<u8>,
   cycles: usize,
   follow_jumps: bool,
 }
@@ -31,8 +32,12 @@ impl Instruction {
     inst
   }
   // pub fn new(opcode: u8) -> Instruction {}
-  pub fn execute(&mut self, mut cpu: &mut CPU, mapper: &Mapper) {
-    println!("Payload beginning: {:?}", self.payload);
+  pub fn execute(&mut self, mut cpu: &mut CPU, mapper: &mut Mapper) {
+    println!(
+      "Payload beginning: {:?} length: {}",
+      &self.payload,
+      &self.payload.len()
+    );
     // Get the correct address for instruction
     let effective_address =
       self
@@ -50,6 +55,60 @@ impl Instruction {
       }
       Opcodes::CLC => {
         cpu.regs.P.c = 0;
+      }
+      Opcodes::CPX => {
+        // 8 Bit registers
+        if cpu.regs.P.x == 1 {
+          let val;
+          if self.address_mode != AddressModes::Immediate {
+            val = mapper.read(effective_address);
+          } else {
+            val = self.payload[0];
+          }
+          let bar = cpu.regs.X.low as u8 - val;
+          if bar >> 7 == 1 {
+            cpu.regs.P.n = 1;
+          } else {
+            cpu.regs.P.n = 0;
+          }
+          if bar == 0 {
+            cpu.regs.P.z = 1;
+          } else {
+            cpu.regs.P.z = 0;
+          }
+          // TODO: double check this.
+          if cpu.regs.X.low as u8 >= bar {
+            cpu.regs.P.c = 1;
+          } else {
+            cpu.regs.P.c = 0;
+          }
+        } else {
+          let val;
+          if self.address_mode != AddressModes::Immediate {
+            val = mapper.read(effective_address) as u16
+              | (mapper.read(effective_address + 1) as u16) << 8;
+          } else {
+            val = self.payload[1] as u16 | ((self.payload[0] as u16) << 8);
+          }
+          let bar = <u16>::from(cpu.regs.X) - val;
+          println!("@@@@ CPX intermediate val: {:X}", bar);
+          if bar >> 15 == 1 {
+            cpu.regs.P.n = 1;
+          } else {
+            cpu.regs.P.n = 0;
+          }
+          if bar == 0 {
+            cpu.regs.P.z = 1;
+          } else {
+            cpu.regs.P.z = 0;
+          }
+          // TODO: double check this.
+          if <u16>::from(cpu.regs.X) >= bar {
+            cpu.regs.P.c = 1;
+          } else {
+            cpu.regs.P.c = 0;
+          }
+        }
       }
       Opcodes::XCE => {
         // Exchange carry with phantom emulation flag
@@ -79,6 +138,7 @@ impl Instruction {
       Opcodes::PHB => cpu.stack_push(cpu.regs.DBR),
       Opcodes::LDX => {
         if cpu.regs.P.x != 1 {
+          // TODO: use effective_address here
           println!("Payload beginning: {:?}", self.payload);
           let load_address = self.payload[1] as u16 | (self.payload[0] as u16) << 8;
 
@@ -115,7 +175,7 @@ impl Instruction {
         } else {
           let load_address = self.payload[0];
 
-          let mut val = 0;
+          let val;
           if self.address_mode == AddressModes::Immediate {
             val = load_address;
           } else {
@@ -171,18 +231,18 @@ impl Instruction {
       Opcodes::JMP => {
         // TODO: At long jumoing: Bank Mapping e.g. in HiRom is bank 80 - 9f  = 00 - 1f etc
         //  also do this in AddressMode module
-        let address =
-            /*(cpu.regs.PBR as u32) << 16 | */ (self.payload[1] as u32) << 8 | self.payload[0] as u32;
-        // cpu.pc =
-        cpu.regs.PC = address.try_into().unwrap();
-        // } else {
-        // }
+        println!("### PAYLOAD{:?}", self.payload);
+        // TODO: Use Memmaper to handle program/databank register update and returning 16 Bit pc
+        let address = effective_address;
+        if self.follow_jumps {
+          cpu.regs.PC = address.try_into().unwrap();
+        }
       }
-      // TODO: implement Stack
       Opcodes::JSR => {
         println!("Going to jump, yo!");
         // println!("JSR: CPU {:?}", cpu);
 
+        println!("### PAYLOAD{:?}", self.payload);
         if self.follow_jumps {
           let pc_low = (cpu.regs.PC & 0x00ff) as u8;
           let pc_high = (cpu.regs.PC >> 8) as u8;
@@ -190,11 +250,8 @@ impl Instruction {
           cpu.stack_push(pc_high);
           cpu.stack_push(pc_low);
 
-          println!("### PAYLOAD{:?}", self.payload);
-
           // TODO: Use MemMapper in order to resolve the to correct rom address
-          let address =
-            (cpu.regs.PBR as u32) << 16 | (self.payload[1] as u32) << 8 | self.payload[0] as u32;
+          let address = effective_address;
           println!("Jump to: {:x}", address);
           // panic!("FUUUUUUU");
           cpu.regs.PC = address.try_into().unwrap();
@@ -202,13 +259,17 @@ impl Instruction {
         // println!("JSR CPU: {:?} ", cpu);
       }
       Opcodes::RTS => {
-        let low = cpu.stack_pull();
-        let high = cpu.stack_pull();
+        println!("RTS: return to subroutine")
+        // This is handled by the address resolving
+        //
+        //
+        // let low = cpu.stack_pull();
+        // let high = cpu.stack_pull();
 
-        let address = (cpu.regs.PBR as u32) << 16 | (high as u32) << 8 | low as u32;
+        // let address = (cpu.regs.PBR as u32) << 16 | (high as u32) << 8 | low as u32;
 
-        println!("# Return to Subroutine {:x}", address);
-        cpu.regs.PC = address.try_into().unwrap();
+        // println!("# Return to Subroutine {:x}", address);
+        // cpu.regs.PC = address.try_into().unwrap();
       }
       Opcodes::LDA => {
         if cpu.regs.P.m != 1 {
@@ -234,12 +295,64 @@ impl Instruction {
       }
       Opcodes::STA => {
         println!("STA ====>{:?}", self.payload);
-        // mapper[address] = payload;
-        // if cpu.regs.P.m != 0 {
-        //   mapper
-        // } else {
-
-        // }
+        if cpu.regs.P.m == 1 && cpu.e {
+          mapper.write(effective_address, cpu.regs.C.A.try_into().unwrap());
+        } else {
+          mapper.write_u16(effective_address, cpu.regs.C.try_into().unwrap());
+        }
+      }
+      Opcodes::STZ => {
+        mapper.write(effective_address, 0x0);
+      }
+      Opcodes::STX => {
+        if !cpu.e {
+          mapper.write(effective_address, cpu.regs.X.low as u8);
+        } else if cpu.regs.P.x == 1 {
+          mapper.write(effective_address, cpu.regs.X.low as u8);
+          mapper.write(effective_address + 1, cpu.regs.X.high as u8);
+        }
+      }
+      Opcodes::TAX => {
+        if !cpu.e {
+          // native mode
+          // 8 Bit accumulator, 8 bit index registers
+          cpu.regs.X.low = cpu.regs.C.A;
+        } else {
+          // 8 bit accumulator, 16 bit index registers
+          if cpu.regs.P.m == 1 && cpu.regs.P.x == 0 {
+            cpu.regs.X.low = cpu.regs.C.A;
+            cpu.regs.X.high = cpu.regs.C.B;
+          }
+          // 16 bit accumulator, 8 bit index registers
+          if cpu.regs.P.m == 0 && cpu.regs.P.x == 1 {
+            cpu.regs.X.low = cpu.regs.C.A;
+          }
+          if cpu.regs.P.m == 0 && cpu.regs.P.x == 0 {
+            cpu.regs.X.low = cpu.regs.C.A;
+            cpu.regs.X.high = cpu.regs.C.B;
+          }
+        }
+        if (cpu.regs.C.A >> 7) == 1 {
+          cpu.regs.P.n = 1;
+        } else {
+          cpu.regs.P.n = 0;
+        }
+        if cpu.regs.C.A == 0 {
+          cpu.regs.P.z = 1;
+        } else {
+          cpu.regs.P.z = 0;
+        }
+      }
+      Opcodes::INX => {
+        let index: u16 = u16::from(cpu.regs.X) + 1;
+        cpu.regs.X = IndexRegister::from(index);
+      }
+      Opcodes::BNE => {
+        if cpu.regs.P.z == 1 {
+          return;
+        } else {
+          cpu.regs.PC = effective_address as _;
+        }
       }
       // Opcodes::ORA => {
       //   if cpu.regs.P.m != 1 {
@@ -264,12 +377,12 @@ impl Instruction {
       //   }
       // }
       _ => {
-        // unimplemented!(
-        //   "{:?} {:?} payload: {:?}",
-        //   &self.opcode,
-        //   &self.address_mode,
-        //   &self.payload,
-        // );
+        unimplemented!(
+          "{:?} {:?} payload: {:?}",
+          &self.opcode,
+          &self.address_mode,
+          &self.payload,
+        );
       }
     }
   }

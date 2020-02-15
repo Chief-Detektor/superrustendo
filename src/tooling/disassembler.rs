@@ -1,9 +1,10 @@
 use crate::cpu::addressmodes::AddressModes;
 use crate::cpu::decoder::Opcodes;
 use crate::cpu::instructions::Instruction;
-use crate::cpu::CPU;
 use std::collections::HashMap;
 use std::convert::TryInto;
+
+// TODO: Use macros to get rid of duplicate code
 
 pub trait PrintToken {
   fn print(&self, label_map: &mut HashMap<usize, String>) -> String;
@@ -13,6 +14,7 @@ impl PrintToken for Instruction {
   fn print(&self, mut label_map: &mut HashMap<usize, String>) -> String {
     let mut op_string = get_opcode_string(&self.opcode);
     op_string.push_str(&get_operant_string(
+      &self.opcode,
       &self.address_mode,
       &self.payload,
       self.address,
@@ -117,6 +119,7 @@ fn get_opcode_string(op: &Opcodes) -> String {
 }
 
 fn get_operant_string(
+  opcode: &Opcodes,
   addressmode: &AddressModes,
   payload: &Vec<u8>,
   address: u32,
@@ -130,12 +133,78 @@ fn get_operant_string(
       } else {
         constant = payload[0] as u16 | (payload[1] as u16) << 8;
       }
+
+      println!("=====> Constant: {:x}", constant);
+
       let mut ret = String::from("$");
       let mut number = format!("{:x}", constant).to_string();
       if number.len() % 2 == 1 {
         number = "0".to_owned() + &number;
       }
-      ret.push_str(&number);
+      let label_number = label_map.len().to_string();
+      if *opcode == Opcodes::JSR {
+        &label_map.insert(
+          ((constant as i32) as u32).try_into().unwrap(),
+          "Label_".to_owned() + &label_number,
+        );
+        ret.push_str(&(("Label_".to_owned() + &label_number) + &" ; 0x".to_owned() + &number));
+      } else {
+        ret.push_str(&number);
+      }
+      ret
+    }
+    AddressModes::AbsoluteIndexedX => {
+      let constant: u16;
+      if payload.len() < 2 {
+        constant = payload[0].into();
+      } else {
+        constant = payload[0] as u16 | (payload[1] as u16) << 8;
+      }
+
+      println!("=====> Constant: {:x}", constant);
+
+      let mut ret = String::from("$");
+      let mut number = format!("{:x}, X", constant).to_string();
+      if number.len() % 2 == 1 {
+        number = "0".to_owned() + &number;
+      }
+      let label_number = label_map.len().to_string();
+      if *opcode == Opcodes::JSR {
+        &label_map.insert(
+          ((constant as i32) as u32).try_into().unwrap(),
+          "Label_".to_owned() + &label_number,
+        );
+        ret.push_str(&(("Label_".to_owned() + &label_number) + &" ; 0x".to_owned() + &number));
+      } else {
+        ret.push_str(&number);
+      }
+      ret
+    }
+    AddressModes::AbsoluteIndexedY => {
+      let constant: u16;
+      if payload.len() < 2 {
+        constant = payload[0].into();
+      } else {
+        constant = payload[0] as u16 | (payload[1] as u16) << 8;
+      }
+
+      println!("=====> Constant: {:x}", constant);
+
+      let mut ret = String::from("$");
+      let mut number = format!("{:x}, Y", constant).to_string();
+      if number.len() % 2 == 1 {
+        number = "0".to_owned() + &number;
+      }
+      let label_number = label_map.len().to_string();
+      if *opcode == Opcodes::JSR {
+        &label_map.insert(
+          ((constant as i32) as u32).try_into().unwrap(),
+          "Label_".to_owned() + &label_number,
+        );
+        ret.push_str(&(("Label_".to_owned() + &label_number) + &" ; 0x".to_owned() + &number));
+      } else {
+        ret.push_str(&number);
+      }
       ret
     }
     AddressModes::AbsoluteLong => {
@@ -145,7 +214,16 @@ fn get_operant_string(
       if number.len() % 2 == 1 {
         number = "0".to_owned() + &number;
       }
-      ret.push_str(&number);
+      if *opcode == Opcodes::JSR {
+        let label_number = label_map.len().to_string();
+        &label_map.insert(
+          ((constant as i32) as u32).try_into().unwrap(),
+          "Label_".to_owned() + &label_number,
+        );
+        ret.push_str(&(("Label_".to_owned() + &label_number) + &" ; 0x".to_owned() + &number));
+      } else {
+        ret.push_str(&number);
+      }
       ret
     }
     AddressModes::AbsoluteLongIndexedX => {
@@ -155,7 +233,12 @@ fn get_operant_string(
       if number.len() % 2 == 1 {
         number = "0".to_owned() + &number;
       }
-      ret.push_str(&number);
+      let label_number = label_map.len().to_string();
+      &label_map.insert(
+        ((address as i32) as u32).try_into().unwrap(),
+        "Label_".to_owned() + &label_number,
+      );
+      ret.push_str(&(("Label_".to_owned() + &label_number) + &" ; 0x".to_owned() + &number));
       ret
     }
     AddressModes::DirectPage => {
@@ -188,6 +271,16 @@ fn get_operant_string(
       ret.push_str(&format!("({})", number));
       ret
     }
+    AddressModes::DirectPageIndexedX => {
+      let constant: u8 = payload[0];
+      let mut ret = String::from("$");
+      let mut number = format!("{:x}", constant).to_string();
+      if number.len() % 2 == 1 {
+        number = "0".to_owned() + &number;
+      }
+      ret.push_str(&format!("{}, X", number));
+      ret
+    }
     AddressModes::DirectPageIndexedIndirectX => {
       let constant: u8 = payload[0];
       let mut ret = String::from("$");
@@ -196,6 +289,16 @@ fn get_operant_string(
         number = "0".to_owned() + &number;
       }
       ret.push_str(&format!("({}, X)", number));
+      ret
+    }
+    AddressModes::DirectPageIndexedIndirectY => {
+      let constant: u8 = payload[0];
+      let mut ret = String::from("$");
+      let mut number = format!("{:x}", constant).to_string();
+      if number.len() % 2 == 1 {
+        number = "0".to_owned() + &number;
+      }
+      ret.push_str(&format!("({}), X", number));
       ret
     }
     AddressModes::Immediate => {
@@ -257,17 +360,14 @@ fn get_operant_string(
           .unwrap(),
         "Label_".to_owned() + &label_number,
       );
-      // ret.push_str(&number);
       ret.push_str(&(("Label_".to_owned() + &label_number) + &" ; 0x".to_owned() + &number));
       ret
     }
     AddressModes::DirectPageIndirectLongIndexedY => {
       let constant = payload[0];
       let mut ret = String::from("$");
-      let mut number = format!("[{:x}], Y", constant).to_string();
-      // if number.len() % 2 == 1 {
-      //   number = "0".to_owned() + &number;
-      // }
+      let number = format!("[{:x}], Y", constant).to_string();
+
       ret.push_str(&number);
       ret
     }
@@ -276,8 +376,26 @@ fn get_operant_string(
     AddressModes::StackInterrupt => String::from(""),
     AddressModes::Accumulator => String::from("A"),
     AddressModes::Unknown => String::from("{:x}".to_owned() + &payload[0].to_string()),
-    AddressModes::BlockMove => payload[0].to_string() + "," + &payload[1].to_string(),
-    AddressModes::StackAbsolute => payload[0].to_string(), // _ => String::from("addmode_unimplemented"),
+    AddressModes::BlockMove => format!("0x{:x}, 0x{:x}", payload[0], payload[1]),
+    AddressModes::StackAbsolute => format!("0x{:x}", payload[0]),
+    AddressModes::StackRTL => String::from(""),
+    AddressModes::ProgrammCounterRelativeLong => {
+      let constant: u32 = payload[0] as u32 | (payload[1] as u32) << 8;
+      let mut ret = String::from("$");
+      let mut number = format!("{:x}, X", constant).to_string();
+      if number.len() % 2 == 1 {
+        number = "0".to_owned() + &number;
+      }
+      let label_number = label_map.len().to_string();
+      &label_map.insert(
+        ((address as i32 + 2 + constant as i32) as u32)
+          .try_into()
+          .unwrap(),
+        "Label_".to_owned() + &label_number,
+      );
+      ret.push_str(&(("Label_".to_owned() + &label_number) + &" ; 0x".to_owned() + &number));
+      ret
+    }
     _ => panic!("{:?}", addressmode),
   }
 }

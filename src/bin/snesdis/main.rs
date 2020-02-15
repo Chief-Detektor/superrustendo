@@ -4,15 +4,12 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
-pub mod cartridge;
-pub mod cpu;
-pub mod mem;
-pub mod tooling;
 
-use crate::cpu::decoder::*;
-use crate::cpu::*;
-use crate::mem::Mapper;
-use crate::tooling::disassembler::PrintToken;
+use superrustendo::cartridge::Cartridge;
+use superrustendo::cpu::decoder::*;
+use superrustendo::cpu::*;
+use superrustendo::mem::Mapper;
+use superrustendo::tooling::disassembler::PrintToken;
 
 fn main() -> std::io::Result<()> {
   let args: Vec<String> = env::args().collect();
@@ -24,7 +21,7 @@ fn main() -> std::io::Result<()> {
     ));
   }
 
-  let mut card = cartridge::Cartridge::load_rom(Path::new(&args[1]));
+  let mut card = Cartridge::load_rom(Path::new(&args[1]));
   println!("Loaded Cardidge: {:?}", card.header);
 
   let mut cpu = CPU::new();
@@ -43,7 +40,8 @@ fn main() -> std::io::Result<()> {
   for (i, instr) in decoder.enumerate() {
     instr.print_info();
     decoded_asm.push((instr.address, instr.print(&mut labels)));
-    if i == 200 {
+    if i == 125 {
+      // if &decoder.next().unwrap().opcode == &Opcodes::BRK {
       break;
     }
   }
@@ -72,7 +70,7 @@ fn main() -> std::io::Result<()> {
       let label = labels.get(&(address as usize)).unwrap();
       println!("{}:", label);
     }
-    println!("\t{:#x}:\t{}", address, line);
+    println!("{:x}:{:x}:\t{}", cpu.regs.PBR, address, line);
   }
 
   Ok(())
