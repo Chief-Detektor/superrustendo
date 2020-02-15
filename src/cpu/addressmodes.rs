@@ -4,7 +4,7 @@ use super::instructions::*;
 use super::Registers;
 use super::CPU;
 use crate::mem::Mapper;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AddressModes {
@@ -68,7 +68,7 @@ impl AddressModes {
       AddressModes::DirectPageIndirectLongIndexedY => 2,
       AddressModes::Immediate => {
         match *op {
-          Opcodes::LDX => {
+          Opcodes::LDX | Opcodes::CPX => {
             if regs.P.x != 1 {
               return 3;
             }
@@ -118,7 +118,7 @@ impl AddressModes {
         return ((bank as usize) << 16 | (data[1] as usize) << 8 | data[0] as usize) as usize;
       }
       AddressModes::AbsoluteIndexedX => {
-        unimplemented!();
+        // unimplemented!();
         // let data = payload.as_slice();
 
         // let mut number = (cpu.regs.DBR as u32) << 16 | (data[1] as u32) << 8 | data[0] as u32;
@@ -134,24 +134,53 @@ impl AddressModes {
         // return number as usize;
       }
       AddressModes::AbsoluteLong => {
-        let op_low = payload.as_slice();
-        // let op_high = payload[1];
-        // let op_bank = cpu.regs.DBR;
-        println!(
-          "### ABSOLUTE LONG: Bank: {:x} high: {:x} low: {:?}",
-          0, 0, op_low
-        );
-        return 0;
+        let op_low = payload[0];
+        let op_high = payload[1];
+        let op_bank = payload[2];
+        // println!(
+        //   "### ABSOLUTE LONG: Bank: {:x} high: {:x} low: {:?}",
+        //   op_bank, op_high, op_low
+        // );
+        return ((op_bank as u32) << 16 | (op_high as u32) << 8 | op_low as u32)
+          .try_into()
+          .unwrap();
       }
       AddressModes::Implied => println!("Implied addressing"),
-      AddressModes::Immediate => println!("Immediate addressing"),
+      AddressModes::Immediate => println!("Immediate addressing"), // TODO: Return Payload as slice?
+      AddressModes::ProgrammCounterRelative => {
+        let offset: i8 = payload[0] as _;
+        let foo = offset as i16;
+        println!("ProgrammCounterRelative: {}, {}", offset as i32, payload[0]);
+        let address: u32 = (foo as i32 + (cpu.regs.PC as i32)).try_into().unwrap();
+        return (((cpu.regs.PBR as u32) << 16) | address) as usize;
+      }
+      AddressModes::StackPCRelativeLong => {
+        // println!("### ProgramCounterRelative: {:?}", payload);
+        let op_low = payload[0];
+        // let op_high = payload[1];
+        let address = cpu.regs.PC + op_low as u16;
+        println!("### address: {:x}", address);
+
+        cpu.stack_push((address & 0x00ff) as u8);
+        cpu.stack_push(((address & 0xff00) >> 8) as u8);
+
+        // return.try_into().unwrap();
+      }
+      AddressModes::StackRTS => {
+        let op_low = cpu.stack_pull();
+        let op_high = cpu.stack_pull();
+        cpu.regs.PC = ((op_high as u16) << 8) | op_low as u16;
+      }
+      AddressModes::StackInterrupt => {
+        // TODO
+      }
       _ => {
-        // unimplemented!(
-        //   "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
-        //   self,
-        //   opcode,
-        //   cpu.regs
-        // );
+        unimplemented!(
+          "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
+          self,
+          opcode,
+          cpu.regs
+        );
       }
     };
     0

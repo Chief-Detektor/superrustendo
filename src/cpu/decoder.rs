@@ -6,6 +6,8 @@ use crate::cpu::constants::*;
 use crate::cpu::instructions::Instruction;
 use crate::cpu::CPU;
 use crate::mem::Mapper;
+use std::convert::TryInto;
+use std::num::Wrapping;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Opcodes {
@@ -466,12 +468,12 @@ pub struct Decoder<'t> {
 }
 
 impl<'t> Decoder<'t> {
-  pub fn new(cpu: &'t mut super::CPU, mapper: &'t mut Mapper) -> Decoder<'t> {
+  pub fn new(cpu: &'t mut super::CPU, mapper: &'t mut Mapper, follow_jumps: bool) -> Decoder<'t> {
     let mut decoder = Decoder {
       instructions: Vec::new(),
       cpu: cpu,
       mapper: mapper, // Mem Mapper?
-      follow_jumps: true,
+      follow_jumps: follow_jumps,
     };
 
     match decoder.mapper.cartridge {
@@ -501,7 +503,7 @@ impl<'t> Decoder<'t> {
   ///
   /// let mut c = CPU::new();
   /// let mut m = Mapper { cartridge: None };
-  /// let d = Decoder::new(&mut c, &mut m);
+  /// let d = Decoder::new(&mut c, &mut m, /* follow_jumps */ false);
   /// let result = d.decode(0x3d);
   /// let res = result.unwrap();
   /// let addr = res.1;
