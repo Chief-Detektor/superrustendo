@@ -171,8 +171,6 @@ impl Cartridge {
     } else {
       println!("No header found");
     }
-
-    // println!("Loaded header:\n{:?}", header);
     card
   }
 
@@ -205,8 +203,6 @@ impl Cartridge {
       return None;
     }
 
-    // println!("{:?}", raw);
-
     Some(snes_header)
   }
 
@@ -217,7 +213,6 @@ impl Cartridge {
   pub fn read_u16(&self, address: usize) -> u16 {
     let ret = self.read_bytes_reverse(address, 2);
     ret[1] as u16 | ((ret[0] as u16) << 8)
-    // ret[]
   }
 
   pub fn read_bytes(&self, address: usize, length: usize) -> Vec<u8> {
@@ -240,10 +235,6 @@ impl Cartridge {
     ret
   }
 }
-
-// pub fn read_header(path: &Path) -> SnesHeader {}
-
-// pub fn get_rom_type() {}
 
 pub fn test_for_smc_header(path: &Path) -> Result<bool, &'static str> {
   let mut f = File::open(&path).unwrap();

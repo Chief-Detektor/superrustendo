@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 use std::env;
-use std::fs::File;
-use std::io::prelude::*;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 
@@ -21,13 +19,12 @@ fn main() -> std::io::Result<()> {
     ));
   }
 
-  let mut card = Cartridge::load_rom(Path::new(&args[1]));
+  let card = Cartridge::load_rom(Path::new(&args[1]));
   println!("Loaded Cardidge: {:?}", card.header);
 
   let mut cpu = CPU::new();
 
   // TODO: Fix address offsets => rom mapping starts at 0x8000.. for bank 00
-  // cpu.regs.PC = 0x4;
   let mut mapper = Mapper {
     cartridge: Some(card),
   };
@@ -41,23 +38,12 @@ fn main() -> std::io::Result<()> {
     instr.print_info();
     decoded_asm.push((instr.address, instr.print(&mut labels)));
     if i == 125 {
-      // if &decoder.next().unwrap().opcode == &Opcodes::BRK {
       break;
     }
   }
 
   println!();
   println!("Dissassembled code:");
-
-  // for (address, line) in decoded_asm.iter_mut() {
-  //   if labels.contains_key(&(*address as usize)) {
-  //     let label = labels.get(&(*address as usize)).unwrap();
-  //     *line = format!("{}:\n {}", label, line);
-  //     // line = line + labels.get(&(*address as usize));
-  //   }
-  //   // Don't print, yet
-  //   // println!("{:#x}: {}", address, line);
-  // }
 
   println!("Labels:");
   for (k, l) in &labels {

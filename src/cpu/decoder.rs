@@ -1,4 +1,3 @@
-use crate::cartridge::RomTypes;
 use crate::cpu::addressmodes::{
   get_gi_addr_mode, get_gii_addr_mode, get_gii_reg_load_addr_mode, AddressModes,
 };
@@ -114,14 +113,6 @@ impl Default for Opcodes {
 }
 
 fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
-  // println!("Decode group III: {:X}, {:b}", opcode, G3_OP_TSB);
-  // println!(
-  //   "G III {:b}, {:b}, {:x}",
-  //   G3_OP_TSB,
-  //   opcode | 0x4 | 0xc,
-  //   opcode
-  // );
-
   match opcode | G3_OP_TSB {
     G3_OP_TSB => match opcode {
       0xc => return Some((Opcodes::TSB, AddressModes::Absolute)),
@@ -270,23 +261,11 @@ fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
     G3_OP_XCE => Some((Opcodes::XCE, AddressModes::Implied)),
     _ => None,
   }
-  // Some((Opcodes::BRK, AddressModes::StackInterrupt, 2))
 }
 
 fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
-  // let group_2_mask: u8 = !GII_MASK;
-  // let group_2_mask4addr_mode: u8 = !GII_MASK_4_ADDR_MODES;
   let g2_mask = opcode & !GII_MASK;
   let g2_mask2 = opcode & !GII_MASK2;
-  // | (opcode & !GII_MASK2);
-  //  | opcode & group_2_mask4addr_mode;
-
-  // println!(
-  //   "Decode group II: {:b}, {:b}, {:b}",
-  //   opcode,
-  //   g2_mask,
-  //   opcode & g2_mask
-  // );
 
   // LDX LDY
 
@@ -306,7 +285,6 @@ fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
 
   match g2_mask2 {
     G2_OP_DEC => {
-      // println!("Test for DEC {:b}", opcode);
       if let Some(address_mode) = get_gii_addr_mode(opcode) {
         return Some((Opcodes::DEC, address_mode));
       } else {
@@ -389,7 +367,6 @@ fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   let group_1_mask: u8 = !GI_MASK;
   let g1_mask = opcode & group_1_mask;
 
-  // println!("{:b}  {:b}", g1_mask, opcode);
   match g1_mask {
     G1_OP_ADC => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
@@ -442,20 +419,12 @@ fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
     }
     G1_OP_STA => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        // No immediate mode for STA
-        // match addr_mode {
-        //   AddressModes::Immediate => return None,
-        //   _ => {}
-        // };
         Some((Opcodes::STA, addr_mode))
       } else {
         None
       }
     }
-    _ => {
-      // println!("No Group I opcode");
-      None
-    }
+    _ => None,
   }
 }
 
@@ -472,7 +441,7 @@ impl<'t> Decoder<'t> {
     let mut decoder = Decoder {
       instructions: Vec::new(),
       cpu: cpu,
-      mapper: mapper, // Mem Mapper?
+      mapper: mapper,
       follow_jumps: follow_jumps,
     };
 
@@ -524,18 +493,8 @@ impl<'t> Decoder<'t> {
       return Ok(instr);
     }
     // This should never happen because everyting between 0x00..=0xff is interpreted
-    Err("Could not decode opcode")
+    unreachable!();
   }
-
-  // pub fn printInstructions(&self) {
-  //   for i in &self.instructions {
-  //     // println!("{:?}", i);
-  //     println!(
-  //       "{:x}, {:?} {:?} {:?}",
-  //       i.address, i.opcode, i.address_mode, i.operants
-  //     );
-  //   }
-  // }
 }
 
 // This needs to be on ROM?
@@ -554,16 +513,12 @@ impl Iterator for Decoder<'_> {
           .try_into()
           .unwrap(),
       )
-      // .decode(self.mapper.cartridge.read_byte(self.cpu.regs.PC as _))
       .unwrap();
 
     let payload = self.mapper.cartridge.as_ref().unwrap().read_bytes(
       (self.cpu.regs.PC as u32 + 1) as usize, // The payload starts 1 after opcode
       inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
     );
-    // }
-    println!("Decoder payload: {:?}", payload);
-    // println!("Regs: {:?}", self.cpu.regs);
 
     let mut instr = Instruction::new(self.follow_jumps);
     instr.address = self.cpu.regs.PC as _;
@@ -578,12 +533,8 @@ impl Iterator for Decoder<'_> {
     instr.opcode = inst.0;
     instr.address_mode = inst.1;
     instr.payload = payload;
-    // <<<
 
     instr.execute(&mut self.cpu, &mut self.mapper);
-
-    // println!("{:?}, {:x}, {:?}", inst, self.cpu.regs.PC, payload);
-    // None
     Some(instr)
   }
 }

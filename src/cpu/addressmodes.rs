@@ -1,10 +1,8 @@
 use super::constants::*;
 use super::decoder::Opcodes;
-use super::instructions::*;
 use super::Registers;
 use super::CPU;
-use crate::mem::Mapper;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AddressModes {
@@ -117,30 +115,26 @@ impl AddressModes {
 
         return ((bank as usize) << 16 | (data[1] as usize) << 8 | data[0] as usize) as usize;
       }
-      AddressModes::AbsoluteIndexedX => {
-        // unimplemented!();
-        // let data = payload.as_slice();
+      // AddressModes::AbsoluteIndexedX => {
+      // unimplemented!();
+      // let data = payload.as_slice();
 
-        // let mut number = (cpu.regs.DBR as u32) << 16 | (data[1] as u32) << 8 | data[0] as u32;
+      // let mut number = (cpu.regs.DBR as u32) << 16 | (data[1] as u32) << 8 | data[0] as u32;
 
-        // if !cpu.e && cpu.regs.P.x == 0 {
-        //   // 16Bit
-        //   // TODO: byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le
-        //   number += cpu.regs.X as u16;
-        // } else {
-        //   // 8Bit
-        //   number += cpu.regs.X.low as u32;
-        // }
-        // return number as usize;
-      }
+      // if !cpu.e && cpu.regs.P.x == 0 {
+      //   // 16Bit
+      //   // TODO: byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le
+      //   number += cpu.regs.X as u16;
+      // } else {
+      //   // 8Bit
+      //   number += cpu.regs.X.low as u32;
+      // }
+      // return number as usize;
+      // }
       AddressModes::AbsoluteLong => {
         let op_low = payload[0];
         let op_high = payload[1];
         let op_bank = payload[2];
-        // println!(
-        //   "### ABSOLUTE LONG: Bank: {:x} high: {:x} low: {:?}",
-        //   op_bank, op_high, op_low
-        // );
         return ((op_bank as u32) << 16 | (op_high as u32) << 8 | op_low as u32)
           .try_into()
           .unwrap();
@@ -150,30 +144,23 @@ impl AddressModes {
       AddressModes::ProgrammCounterRelative => {
         let offset: i8 = payload[0] as _;
         let foo = offset as i16;
-        println!("ProgrammCounterRelative: {}, {}", offset as i32, payload[0]);
         let address: u32 = (foo as i32 + (cpu.regs.PC as i32)).try_into().unwrap();
         return (((cpu.regs.PBR as u32) << 16) | address) as usize;
       }
       AddressModes::StackPCRelativeLong => {
-        // println!("### ProgramCounterRelative: {:?}", payload);
         let op_low = payload[0];
-        // let op_high = payload[1];
         let address = cpu.regs.PC + op_low as u16;
-        println!("### address: {:x}", address);
-
         cpu.stack_push((address & 0x00ff) as u8);
         cpu.stack_push(((address & 0xff00) >> 8) as u8);
-
-        // return.try_into().unwrap();
       }
       AddressModes::StackRTS => {
         let op_low = cpu.stack_pull();
         let op_high = cpu.stack_pull();
         cpu.regs.PC = ((op_high as u16) << 8) | op_low as u16;
       }
-      AddressModes::StackInterrupt => {
-        // TODO
-      }
+      // AddressModes::StackInterrupt => {
+      //   // TODO
+      // }
       _ => {
         unimplemented!(
           "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
@@ -216,9 +203,7 @@ pub fn get_gii_reg_load_addr_mode(opcode: u8) -> Option<AddressModes> {
 
 pub fn get_gii_addr_mode(opcode: u8) -> Option<AddressModes> {
   let mask = opcode & GII_MASK;
-  //  & (opcode & GII_MASK2);
 
-  // println!("get_ii_addr_mode {:b}, opcode: {:b}", mask, opcode);
   match mask {
     G2_ADDR_MODE_ACCUMULATOR => Some(AddressModes::Accumulator),
     G2_ADDR_MODE_ABSOLUTE => Some(AddressModes::Absolute),
@@ -231,8 +216,6 @@ pub fn get_gii_addr_mode(opcode: u8) -> Option<AddressModes> {
 
 pub fn get_gi_addr_mode(opcode: u8) -> Option<AddressModes> {
   let mask = opcode & GI_MASK;
-
-  // println!("G1 opcode: {:b}, mask: {:b}", opcode, mask);
 
   match mask {
     GI_ADDR_MODE_INTERMEDIATE => Some(AddressModes::Immediate), // Add 1 byte if m = 0 (16Bit memory/accumulator)
@@ -262,5 +245,4 @@ pub fn get_gi_addr_mode(opcode: u8) -> Option<AddressModes> {
       return None;
     }
   }
-  // return true;
 }
