@@ -3,7 +3,7 @@ macro_rules! opcode_test {
   ($raw_byte:expr, $opcode:expr, $addressmode:expr) => {{
     let mut c = CPU::new();
     let mut m = Mapper { cartridge: None };
-    let d = Decoder::new(&mut c, &mut m);
+    let d = Decoder::new(&mut c, &mut m, false);
     let result = d.decode($raw_byte);
     let res = result.unwrap();
     let addr = res.1;

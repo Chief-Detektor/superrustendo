@@ -45,6 +45,12 @@ impl MakeupType {
   }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum RomTypes {
+  LowRom,
+  HiRom,
+}
+
 // TODO: Use byte_struct here and also padding
 #[derive(ByteStruct, Copy, Clone, Default)]
 #[byte_struct_le]
@@ -129,6 +135,7 @@ impl fmt::Debug for SnesHeader {
 pub struct Cartridge {
   pub rom: Vec<u8>,
   pub header: SnesHeader,
+  pub rom_type: Option<RomTypes>,
   pub size: usize,
 }
 
@@ -149,20 +156,21 @@ impl Cartridge {
     let mut card = Cartridge {
       rom,
       size,
+      rom_type: None,
       header: SnesHeader::default(),
     };
 
     if let Some(header) = card.load_header(hi_rom) {
       println!("Hi Rom Detected");
       card.header = header;
+      card.rom_type = Some(RomTypes::HiRom);
     } else if let Some(header) = card.load_header(low_rom) {
       println!("Low Rom Detected");
       card.header = header;
+      card.rom_type = Some(RomTypes::LowRom);
     } else {
       println!("No header found");
     }
-
-    // println!("Loaded header:\n{:?}", header);
     card
   }
 
@@ -195,8 +203,6 @@ impl Cartridge {
       return None;
     }
 
-    // println!("{:?}", raw);
-
     Some(snes_header)
   }
 
@@ -207,13 +213,19 @@ impl Cartridge {
   pub fn read_u16(&self, address: usize) -> u16 {
     let ret = self.read_bytes_reverse(address, 2);
     ret[1] as u16 | ((ret[0] as u16) << 8)
-    // ret[]
   }
 
   pub fn read_bytes(&self, address: usize, length: usize) -> Vec<u8> {
     let mut ret = Vec::with_capacity(length);
-    for i in 0..length {
-      ret.push(self.read_byte(address + i));
+    if self.rom_type == Some(RomTypes::LowRom) {
+      for i in 0..length {
+        // Is this correct?
+        ret.push(self.read_byte((address ^ 0x8000) + i));
+      }
+    } else {
+      for i in 0..length {
+        ret.push(self.read_byte(address + i));
+      }
     }
     ret
   }
@@ -223,10 +235,6 @@ impl Cartridge {
     ret
   }
 }
-
-// pub fn read_header(path: &Path) -> SnesHeader {}
-
-// pub fn get_rom_type() {}
 
 pub fn test_for_smc_header(path: &Path) -> Result<bool, &'static str> {
   let mut f = File::open(&path).unwrap();

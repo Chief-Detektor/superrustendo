@@ -5,6 +5,8 @@ use crate::cpu::constants::*;
 use crate::cpu::instructions::Instruction;
 use crate::cpu::CPU;
 use crate::mem::Mapper;
+use std::convert::TryInto;
+use std::num::Wrapping;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Opcodes {
@@ -110,15 +112,7 @@ impl Default for Opcodes {
   }
 }
 
-pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
-  // println!("Decode group III: {:X}, {:b}", opcode, G3_OP_TSB);
-  // println!(
-  //   "G III {:b}, {:b}, {:x}",
-  //   G3_OP_TSB,
-  //   opcode | 0x4 | 0xc,
-  //   opcode
-  // );
-
+fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   match opcode | G3_OP_TSB {
     G3_OP_TSB => match opcode {
       0xc => return Some((Opcodes::TSB, AddressModes::Absolute)),
@@ -267,23 +261,11 @@ pub fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
     G3_OP_XCE => Some((Opcodes::XCE, AddressModes::Implied)),
     _ => None,
   }
-  // Some((Opcodes::BRK, AddressModes::StackInterrupt, 2))
 }
 
-pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
-  // let group_2_mask: u8 = !GII_MASK;
-  // let group_2_mask4addr_mode: u8 = !GII_MASK_4_ADDR_MODES;
+fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   let g2_mask = opcode & !GII_MASK;
   let g2_mask2 = opcode & !GII_MASK2;
-  // | (opcode & !GII_MASK2);
-  //  | opcode & group_2_mask4addr_mode;
-
-  // println!(
-  //   "Decode group II: {:b}, {:b}, {:b}",
-  //   opcode,
-  //   g2_mask,
-  //   opcode & g2_mask
-  // );
 
   // LDX LDY
 
@@ -303,7 +285,6 @@ pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
 
   match g2_mask2 {
     G2_OP_DEC => {
-      // println!("Test for DEC {:b}", opcode);
       if let Some(address_mode) = get_gii_addr_mode(opcode) {
         return Some((Opcodes::DEC, address_mode));
       } else {
@@ -382,11 +363,10 @@ pub fn decode_group_II(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   }
 }
 
-pub fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
+fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
   let group_1_mask: u8 = !GI_MASK;
   let g1_mask = opcode & group_1_mask;
 
-  // println!("{:b}  {:b}", g1_mask, opcode);
   match g1_mask {
     G1_OP_ADC => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
@@ -439,36 +419,30 @@ pub fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
     }
     G1_OP_STA => {
       if let Some(addr_mode) = get_gi_addr_mode(opcode) {
-        // No immediate mode for STA
-        // match addr_mode {
-        //   AddressModes::Immediate => return None,
-        //   _ => {}
-        // };
         Some((Opcodes::STA, addr_mode))
       } else {
         None
       }
     }
-    _ => {
-      // println!("No Group I opcode");
-      None
-    }
+    _ => None,
   }
 }
 
 #[derive(Debug)]
 pub struct Decoder<'t> {
   instructions: Vec<Instruction>,
-  cpu: &'t mut CPU,
+  pub(crate) cpu: &'t mut CPU,
   mapper: &'t mut Mapper,
+  follow_jumps: bool,
 }
 
 impl<'t> Decoder<'t> {
-  pub fn new(cpu: &'t mut super::CPU, mapper: &'t mut Mapper) -> Decoder<'t> {
+  pub fn new(cpu: &'t mut super::CPU, mapper: &'t mut Mapper, follow_jumps: bool) -> Decoder<'t> {
     let mut decoder = Decoder {
       instructions: Vec::new(),
       cpu: cpu,
-      mapper: mapper, // Mem Mapper?
+      mapper: mapper,
+      follow_jumps: follow_jumps,
     };
 
     match decoder.mapper.cartridge {
@@ -489,20 +463,16 @@ impl<'t> Decoder<'t> {
   /// # Examples
   ///
   /// ```
-  /// use superrustendo::cpu::addressmodes::{
-  /// get_gi_addr_mode, get_gii_addr_mode, get_gii_reg_load_addr_mode, AddressModes,
-  /// };
+  /// use superrustendo::cpu::addressmodes::AddressModes;
   ///
-  /// use superrustendo::cpu::decoder::Opcodes;
-  /// use superrustendo::cpu::decoder::Decoder;
+  /// use superrustendo::cpu::decoder::{ Decoder, Opcodes};
   /// use superrustendo::mem::Mapper;
-  /// use superrustendo::cpu::CPU;
-  /// use superrustendo::cpu::{Accumulator, IndexRegister, Registers, StatusRegister};
+  /// use superrustendo::cpu::{Accumulator, CPU, IndexRegister, Registers, StatusRegister};
   /// use std::convert::TryInto;
   ///
   /// let mut c = CPU::new();
   /// let mut m = Mapper { cartridge: None };
-  /// let d = Decoder::new(&mut c, &mut m);
+  /// let d = Decoder::new(&mut c, &mut m, /* follow_jumps */ false);
   /// let result = d.decode(0x3d);
   /// let res = result.unwrap();
   /// let addr = res.1;
@@ -523,18 +493,8 @@ impl<'t> Decoder<'t> {
       return Ok(instr);
     }
     // This should never happen because everyting between 0x00..=0xff is interpreted
-    Err("Could not decode opcode")
+    unreachable!();
   }
-
-  // pub fn printInstructions(&self) {
-  //   for i in &self.instructions {
-  //     // println!("{:?}", i);
-  //     println!(
-  //       "{:x}, {:?} {:?} {:?}",
-  //       i.address, i.opcode, i.address_mode, i.operants
-  //     );
-  //   }
-  // }
 }
 
 // This needs to be on ROM?
@@ -546,36 +506,35 @@ impl Iterator for Decoder<'_> {
     // let foo = self.mapper[self.cpu.regs.PC as _];
     // println!("Mapper in decoder: {:x}", foo);
     let inst = self
-      .decode(self.mapper[self.cpu.regs.PC as _])
-      // .decode(self.mapper.cartridge.read_byte(self.cpu.regs.PC as _))
+      .decode(
+        self
+          .mapper
+          .read(self.cpu.regs.PC as usize)
+          .try_into()
+          .unwrap(),
+      )
       .unwrap();
 
-    // let payload = self.mapper.cartridge.read_bytes(
-    //   (self.cpu.regs.PC + 1) as usize, // The payload starts 1 after opcode
-    //   inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
-    // );
-    // TODO: Fix this! Mapping should be applied in mapper...
     let payload = self.mapper.cartridge.as_ref().unwrap().read_bytes(
-      (self.cpu.regs.PC + 1 - 0x8000) as usize, // The payload starts 1 after opcode
-      inst.1.len(&self.cpu.regs, &inst.0) - 1,  // substract the opcode from length
+      (self.cpu.regs.PC as u32 + 1) as usize, // The payload starts 1 after opcode
+      inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
     );
 
-    println!("Decoder payload: {:?}", payload);
-
-    let mut instr = Instruction::default();
+    let mut instr = Instruction::new(self.follow_jumps);
     instr.address = self.cpu.regs.PC as _;
+
+    // TODO: Handle Overflow
+
+    let mut new_pc = Wrapping(self.cpu.regs.PC);
     // increase Programm Counter
-    self.cpu.regs.PC += inst.1.len(&self.cpu.regs, &inst.0) as u16;
+    new_pc.0 += inst.1.len(&self.cpu.regs, &inst.0) as u16;
+    self.cpu.regs.PC = new_pc.0;
 
     instr.opcode = inst.0;
     instr.address_mode = inst.1;
     instr.payload = payload;
-    // <<<
 
-    instr.execute(&mut self.cpu, &self.mapper);
-
-    // println!("{:?}, {:x}, {:?}", inst, self.cpu.regs.PC, payload);
-    // None
+    instr.execute(&mut self.cpu, &mut self.mapper);
     Some(instr)
   }
 }

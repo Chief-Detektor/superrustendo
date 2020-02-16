@@ -9,9 +9,9 @@ pub mod decoder;
 pub mod instructions;
 
 // in emulation mode $100 to $1FF
+#[derive(Copy, Clone)]
 pub struct Stack {
-  content: [u8; 0xffff],
-  // constents: Vec<u8>,
+  content: [u8; 0x10000],
 }
 
 impl fmt::Debug for Stack {
@@ -23,7 +23,7 @@ impl fmt::Debug for Stack {
 impl Default for Stack {
   fn default() -> Stack {
     Stack {
-      content: [0; 0xffff],
+      content: [0; 0x10000],
     }
   }
 }
@@ -54,12 +54,10 @@ impl fmt::Debug for StatusRegister {
 }
 
 // Conversion helper functions
-// TODO: From u8 and u16 to IndexRegister and vice versa
 impl From<StatusRegister> for u8 {
   fn from(p: StatusRegister) -> Self {
     let mut number = [0];
     p.write_bytes_default_le(&mut number);
-    // return (number[1] as u16) << 8 | number[0] as u16;
     return number[0];
   }
 }
@@ -110,52 +108,32 @@ impl From<u16> for Accumulator {
   }
 }
 
-// impl From<StatusRegister> for u8 {
-//   fn from(p: IndexRegister) -> Self {
-//     let mut number = [0];
-//     p.write_bytes_default_le(&mut number);
-//     // return (number[1] as u16) << 8 | number[0] as u16;
-//     return number[0];
-//   }
-// }
+impl From<Accumulator> for usize {
+  fn from(register: Accumulator) -> Self {
+    let mut number = [0; 2];
+    register.write_bytes_default_le(&mut number);
+    return (number[1] as usize) << 8 | number[0] as usize;
+  }
+}
 
-// impl From<u8> for IndexRegister {
-//   fn from(byte: u8) -> Self {
-//     let reg = IndexRegister::default();
-//     reg = byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[byte])
-//     return reg;
-//   }
-// }
+impl From<usize> for Accumulator {
+  fn from(number: usize) -> Self {
+    let high = (number >> 8) as u8;
+    let low = (number & 0xff) as u8;
+    byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[low, high])
+  }
+}
 
-// TODO: implement this
-// impl From<IndexRegister> for u16 {
-//   fn from(p: IndexRegister) -> Self {
-//     let mut number = [0];
-//     p.write_bytes_default_le(&mut number);
-//     // return (number[1] as u16) << 8 | number[0] as u16;
-//     return number[0];
-//   }
-// }
-
-// // TODO: Implement this
-// impl From<u8> for IndexRegister {
-//   fn from(number: u16) -> Self {
-//     let reg = Index::default();
-
-//     byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&[byte])
-//     // StatusRegister
-//   }
-// }
-
+// NOTE: Verify if this is correct
 impl Default for StatusRegister {
   fn default() -> StatusRegister {
     StatusRegister {
       n: 0,
       v: 0,
-      m: 0,
-      x: 0,
+      m: 1,
+      x: 1,
       d: 0,
-      i: 0,
+      i: 1,
       z: 0,
       c: 0,
     }
@@ -163,7 +141,7 @@ impl Default for StatusRegister {
 }
 
 bitfields!(
-  #[derive(PartialEq)]
+  #[derive(PartialEq, Copy, Clone)]
   pub Accumulator: u16 {
     pub A: 8,
     pub B: 8,
@@ -206,7 +184,7 @@ impl IndexRegister {
 }
 
 // TODO: Proper inital state
-#[derive(ByteStruct, PartialEq, Debug)]
+#[derive(ByteStruct, PartialEq, Debug, Clone, Copy)]
 #[byte_struct_le]
 pub struct Registers {
   P: StatusRegister,
@@ -215,8 +193,8 @@ pub struct Registers {
   Y: IndexRegister, // Y Index Register,
   D: u16,           // Direct Page Register
   S: IndexRegister, // Stack Pointer (or 24 bits?)
-  PBR: u8,          // Programm Bank Register
-  DBR: u8,          // Data Bank Register
+  pub PBR: u8,      // Programm Bank Register
+  pub DBR: u8,      // Data Bank Register
   pub PC: u16,      // Programm Counter
 }
 
@@ -254,39 +232,26 @@ impl CPU {
 
   pub fn stack_push(&mut self, payload: u8) {
     let index = <u16>::from(self.regs.S);
-    // let index = 0xffff as u16;
-    // println!(
-    //   "=> Stack push {:} pos: {:x}, S: {:?}",
-    //   payload, index, self.regs.S
-    // );
-    self.stack.content[(index - 1) as usize] = payload;
-    self.regs.S = IndexRegister::from(index - 1);
+    println!("Pushing {:x} to address {:x}", payload, index);
+
+    let mut new_index: i32 = index as i32 - 1;
+
+    if new_index == -1 {
+      new_index = 0xffff
+    }
+    self.stack.content[(new_index) as usize] = payload;
+    self.regs.S = IndexRegister::from(new_index as u16);
   }
 
   pub fn stack_pull(&mut self) -> u8 {
     let index = <u16>::from(self.regs.S);
     let ret = self.stack.content[index as usize];
-    // println!("<= Stack pull {:} pos: {:x}", ret, index);
-    self.regs.S = IndexRegister::from(index + 1);
+
+    let mut new_index: i32 = index as i32 + 1;
+    if new_index == 0x10000 {
+      new_index = 0;
+    }
+    self.regs.S = IndexRegister::from(new_index as u16);
     ret
   }
-
-  // pub fn pull(&mut self) -> u8 {
-  //   let ret = self.content[self.sp];
-  //   self.sp += 1;
-  //   ret
-  // pub fn stack_pull(&mut self) -> u8 {
-  //   // increase stack pointer
-  //   let mut stack_pointer = [0x0, 0x0];
-  //   self.regs.S.write_bytes_default_le(&mut stack_pointer);
-  //   stack_pointer[0] = stack_pointer[0] - 1;
-  //   self.regs.S =
-  //     byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le(&stack_pointer);
-
-  //     byte_struct::ByteStructUnspecifiedByteOrder::
-
-  //   // let mut index = [0x0, 0x0];
-  //   // self.regs.P.write_bytes_default_le(&mut index);
-  //   self.stack.content[stack_pointer[0] as usize | (stack_pointer[1] as usize) << 8]
-  // }
 }
