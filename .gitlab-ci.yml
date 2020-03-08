@@ -37,6 +37,7 @@ prepare:
       - target/debug/deps
       - target/release/deps
   script:
+    - rustup update
     - cargo build
 
 test:cargo:
@@ -45,7 +46,7 @@ test:cargo:
     - docker
   script:
     - rustc --version && cargo --version # Print version info for debugging
-    - cargo test -v --all -- -Z unstable-options --format=json > test_results.json
+    - cargo test +nightly -v --all -- -Z unstable-options --format=json > test_results.json
     # make it a vaild json
     - ./format_json.sh test_results.json
   cache:
@@ -64,7 +65,7 @@ benchmark:cargo:
   tags:
     - docker
   script:
-    - cargo bench -v -- -Z unstable-options --format=json > bench_results.json
+    - cargo bench +nightly -v -- -Z unstable-options --format=json > bench_results.json
     # again vaild json..
     - ./format_json.sh bench_results.json
   cache:
@@ -83,7 +84,7 @@ coverage:cargo:
   tags:
     - arch-vm-shell
   script:
-    - "RUSTFLAGS='-C link-dead-code' cargo test --no-run"
+    - "RUSTFLAGS='-C link-dead-code' cargo test +nightly --no-run"
     - kcov --exclude-pattern=/.cargo/,/usr/lib --verify target/cov `ls target/debug/decoder-* | head -n1`
     # - find target/cov -xtype l -delete
     - echo `./show_coverage.sh`
