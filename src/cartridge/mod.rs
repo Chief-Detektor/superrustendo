@@ -1,4 +1,5 @@
 use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByteOrder};
+use std::error::Error;
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs::File;
@@ -143,7 +144,7 @@ impl Cartridge {
   pub fn get_emu_reset_vector(&self) -> u16 {
     self.header.emu_res
   }
-  pub fn load_rom(path: &Path) -> Cartridge {
+  pub fn load_rom(path: &Path) -> Result<Cartridge, &'static str> {
     let mut file = File::open(path).unwrap();
     let mut rom = Vec::new();
     let size = file.read_to_end(&mut rom).unwrap();
@@ -164,14 +165,16 @@ impl Cartridge {
       println!("Hi Rom Detected");
       card.header = header;
       card.rom_type = Some(RomTypes::HiRom);
+      return Ok(card);
     } else if let Some(header) = card.load_header(low_rom) {
       println!("Low Rom Detected");
       card.header = header;
       card.rom_type = Some(RomTypes::LowRom);
+      return Ok(card);
     } else {
       println!("No header found");
+      return Err("Invalid rom");
     }
-    card
   }
 
   fn load_header(&self, address: usize) -> Option<SnesHeader> {
@@ -184,18 +187,18 @@ impl Cartridge {
     for b in &raw[..] {
       i += 1;
       if *b > 0x1f && *b <= 0x7f && i <= 21 {
-        println!("#====> Snes Title is all asci at: {}", i);
+        // println!("#====> Snes Title is all asci at: {}", i);
       } else if i <= 21 {
-        println!("Error! {} is not ascii", *b);
+        // println!("Error! {} is not ascii", *b);
         return None;
       }
     }
 
-    if raw_string::RawStr::from_bytes(&snes_header.title).is_ascii() {
-      println!("String is ascii");
-    } else {
-      println!("title no ascii");
-    }
+    // if raw_string::RawStr::from_bytes(&snes_header.title).is_ascii() {
+    //   println!("String is ascii");
+    // } else {
+    //   println!("title no ascii");
+    // }
 
     // TODO: Find more critieria to check if loaded header is valid
     if snes_header.rom_size == 0 {

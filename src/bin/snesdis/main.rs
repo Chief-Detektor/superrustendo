@@ -19,7 +19,7 @@ fn main() -> std::io::Result<()> {
     ));
   }
 
-  let card = Cartridge::load_rom(Path::new(&args[1]));
+  let card = Cartridge::load_rom(Path::new(&args[1])).expect("Error loading");
   println!("Loaded Cardidge: {:?}", card.header);
 
   let mut cpu = CPU::new();
@@ -29,7 +29,7 @@ fn main() -> std::io::Result<()> {
     cartridge: Some(card),
   };
 
-  let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+  let decoder = Decoder::new(&mut cpu, &mut mapper, true);
 
   let mut labels = HashMap::new();
   let mut decoded_asm = Vec::new();

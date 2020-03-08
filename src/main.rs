@@ -24,7 +24,7 @@ fn main() -> std::io::Result<()> {
     ));
   }
 
-  let mut card = cartridge::Cartridge::load_rom(Path::new(&args[1]));
+  let mut card = cartridge::Cartridge::load_rom(Path::new(&args[1])).expect("Error loading");
   println!("Loaded Cardidge: {:?}", card.header);
 
   let mut cpu = CPU::new();

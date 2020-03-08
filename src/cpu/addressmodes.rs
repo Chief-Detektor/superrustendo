@@ -101,7 +101,7 @@ impl AddressModes {
   pub fn get_effective_address(&self, cpu: &mut CPU, payload: &Vec<u8>, opcode: &Opcodes) -> usize {
     match &self {
       AddressModes::Absolute => {
-        let mut bank = 0;
+        let bank;
         if *opcode == Opcodes::JMP || *opcode == Opcodes::JSR {
           println!("Transfer control");
           bank = cpu.regs.PBR;
@@ -153,6 +153,7 @@ impl AddressModes {
         cpu.stack_push((address & 0x00ff) as u8);
         cpu.stack_push(((address & 0xff00) >> 8) as u8);
       }
+      // TODO: Should this go to RTS instruction instead?
       AddressModes::StackRTS => {
         let op_low = cpu.stack_pull();
         let op_high = cpu.stack_pull();
