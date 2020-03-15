@@ -250,10 +250,14 @@ impl Instruction {
       }
       Opcodes::STA => {
         println!("STA ====>{:?}", self.payload);
-        if cpu.regs.P.m == 1 && cpu.e {
+        if cpu.regs.P.m == 1
+        /*&& cpu.e*/
+        {
           mapper.write(effective_address, cpu.regs.C.A.try_into().unwrap());
         } else {
-          mapper.write_u16(effective_address, cpu.regs.C.try_into().unwrap());
+          mapper.write(effective_address, cpu.regs.C.A.try_into().unwrap());
+          // mapper.write(effective_address + 1, cpu.regs.C.B.try_into().unwrap());
+          // mapper.write_u16(effective_address, cpu.regs.C.try_into().unwrap());
         }
       }
       Opcodes::STZ => {
