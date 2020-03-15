@@ -112,8 +112,8 @@ pages:
   script:
     - find target/cov -xtype l -delete
     - mv target/cov public
-    - mv test_results.json public
-    - mv bench_results.json public
+    # - mv test_results.json public
+    # - mv bench_results.json public
   artifacts:
     paths:
       - public
