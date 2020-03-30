@@ -57,10 +57,10 @@ test:cargo:
       - target/debug/deps
       - target/release/deps
     policy: pull
-  artifacts:
-    paths:
-      - test_results.json
-    expire_in: 30 days
+    # artifacts:
+    #   paths:
+    #     - test_results.json
+    # expire_in: 30 days
 
 # benchmark:cargo:
 #   stage: test

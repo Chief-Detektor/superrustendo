@@ -11,9 +11,9 @@ use std::convert::TryInto;
 pub struct Instruction {
   pub address: u32,
   pub opcode: Opcodes,
-  pub(crate) address_mode: AddressModes,
+  pub address_mode: AddressModes,
   pub(crate) length: usize,
-  pub(crate) payload: Vec<u8>,
+  pub payload: Vec<u8>,
   cycles: usize,
   follow_jumps: bool,
 }
@@ -30,12 +30,14 @@ impl Instruction {
     let effective_address =
       self
         .address_mode
-        .get_effective_address(&mut cpu, &self.payload, &self.opcode);
+        .get_effective_address(&mut cpu, &self.payload, &self.opcode, &mapper);
 
-    println!("Calculated effective address: {:x}", effective_address);
+    println!("Calculated effective address: {:?}", effective_address);
     match &self.opcode {
       Opcodes::BRK => {
-        cpu.regs.PC += 2;
+        // cpu.regs.PC += 2;
+        // TODO: Eval this..
+        cpu.regs.PC = effective_address.unwrap().address;
       }
       Opcodes::CLD => cpu.regs.P.d = 0,
       Opcodes::SEI => {
@@ -49,7 +51,7 @@ impl Instruction {
         if cpu.regs.P.x == 1 {
           let val;
           if self.address_mode != AddressModes::Immediate {
-            val = mapper.read(effective_address);
+            val = mapper.read(effective_address.unwrap());
           } else {
             val = self.payload[0];
           }
@@ -73,8 +75,8 @@ impl Instruction {
         } else {
           let val;
           if self.address_mode != AddressModes::Immediate {
-            val = mapper.read(effective_address) as u16
-              | (mapper.read(effective_address + 1) as u16) << 8;
+            val = mapper.read(effective_address.unwrap()) as u16
+              | (mapper.read(effective_address.unwrap().add(1)) as u16) << 8;
           } else {
             val = self.payload[1] as u16 | ((self.payload[0] as u16) << 8);
           }
@@ -208,9 +210,8 @@ impl Instruction {
         // TODO: At long jumping: Bank Mapping e.g. in HiRom is bank 80 - 9f  = 00 - 1f etc
         //  also do this in AddressMode module
         // TODO: Use Memmaper to handle program/databank register update and returning 16 Bit pc
-        let address = effective_address;
         if self.follow_jumps {
-          cpu.regs.PC = address.try_into().unwrap();
+          cpu.regs.PC = effective_address.unwrap().address;
         }
       }
       Opcodes::JSR => {
@@ -221,22 +222,22 @@ impl Instruction {
           cpu.stack_push(pc_high);
           cpu.stack_push(pc_low);
 
-          let address = effective_address;
-          cpu.regs.PC = address.try_into().unwrap();
+          // let address = effective_address;
+          cpu.regs.PC = effective_address.unwrap().address;
         }
       }
       Opcodes::RTS => {
-        // NOTE: Setting the PC is done by the address resolution in  get_effective_address(...)
-        // Might be more fitting in here.. but nevermind 	¯\_(ツ)_/¯
+        let op_low = cpu.stack_pull();
+        let op_high = cpu.stack_pull();
+        cpu.regs.PC = ((op_high as u16) << 8) | op_low as u16;
       }
       Opcodes::LDA => {
         if cpu.regs.P.m != 1 {
-          println!("### 16 Bit accumulator");
+          // println!("### 16 Bit accumulator");
           let val = (self.payload[1] as u16) << 8 | self.payload[0] as u16;
           cpu.regs.C = Accumulator::from(val);
         } else {
-          println!("### 8 Bit accumulator");
-
+          // println!("### 8 Bit accumulator");
           let val = self.payload[0] as u16;
           cpu.regs.C = Accumulator::from(val);
         }
@@ -246,29 +247,29 @@ impl Instruction {
           .as_ref()
           .unwrap()
           .read_byte(self.payload[0] as _);
-        println!("### Yo check da LDA, Bro: {:?}", foo);
+        // println!("### Yo check da LDA, Bro: {:?}", foo);
       }
       Opcodes::STA => {
-        println!("STA ====>{:?}", self.payload);
+        // println!("STA ====>{:?}", self.payload);
         if cpu.regs.P.m == 1
         /*&& cpu.e*/
         {
-          mapper.write(effective_address, cpu.regs.C.A.try_into().unwrap());
+          mapper.write(effective_address.unwrap(), cpu.regs.C.A.try_into().unwrap());
         } else {
-          mapper.write(effective_address, cpu.regs.C.A.try_into().unwrap());
+          mapper.write(effective_address.unwrap(), cpu.regs.C.A.try_into().unwrap());
           // mapper.write(effective_address + 1, cpu.regs.C.B.try_into().unwrap());
           // mapper.write_u16(effective_address, cpu.regs.C.try_into().unwrap());
         }
       }
       Opcodes::STZ => {
-        mapper.write(effective_address, 0x0);
+        mapper.write(effective_address.unwrap(), 0x0);
       }
       Opcodes::STX => {
         if !cpu.e {
-          mapper.write(effective_address, cpu.regs.X.low as u8);
+          mapper.write(effective_address.unwrap(), cpu.regs.X.low as u8);
         } else if cpu.regs.P.x == 1 {
-          mapper.write(effective_address, cpu.regs.X.low as u8);
-          mapper.write(effective_address + 1, cpu.regs.X.high as u8);
+          mapper.write(effective_address.unwrap(), cpu.regs.X.low as u8);
+          mapper.write(effective_address.unwrap().add(1), cpu.regs.X.high as u8);
         }
       }
       Opcodes::TAX => {
@@ -310,8 +311,11 @@ impl Instruction {
         if cpu.regs.P.z == 1 {
           return;
         } else {
-          cpu.regs.PC = effective_address as _;
+          cpu.regs.PC = effective_address.unwrap().address as _;
         }
+      }
+      Opcodes::PHB => {
+        cpu.stack_push(cpu.regs.DBR);
       }
       // Opcodes::ORA => {
       //   if cpu.regs.P.m != 1 {

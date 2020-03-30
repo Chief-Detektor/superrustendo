@@ -1,2 +1,12 @@
 /target
 **/*.rs.bk
+main.cpp
+OUTPUT.DIS
+readme.html
+readme.txt
+*.sfc
+*.smc
+*.zip
+test
+test.sfc
+*.EXE

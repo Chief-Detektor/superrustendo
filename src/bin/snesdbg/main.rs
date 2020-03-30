@@ -15,6 +15,7 @@ use std::path::Path;
 use std::string::String;
 use superrustendo::cartridge::Cartridge;
 use superrustendo::cpu::decoder::Decoder;
+use superrustendo::cpu::instructions::Instruction;
 use superrustendo::cpu::*;
 use superrustendo::mem::Mapper;
 
@@ -49,7 +50,7 @@ fn main() -> Result<()> {
     let readline = rl.readline(">> ");
     match readline {
       Ok(line) => {
-        println!("Line: {:?}", line);
+        // println!("Line: {:?}", line);
         eval_line(line, &mut decoder);
       }
       Err(ReadlineError::Interrupted) => break,
@@ -60,23 +61,40 @@ fn main() -> Result<()> {
   Ok(())
 }
 
+fn print_instruction(inst: Option<Instruction>) {
+  let i = inst.unwrap();
+  println!(
+    "{:?}, {:?}, payload: {:?}",
+    i.opcode, i.address_mode, i.payload
+  );
+}
+
 fn eval_line(line: String, decoder: &mut Decoder) {
   let mut command = line.split_whitespace();
   match command.next() {
     Some("s" | "step") => {
-      if let Some(steps) = command.next() {
-        // step multiple times
-        let s = steps.parse().unwrap();
-        for i in 1..=s {
-          print!("Step {}: ", i);
-          decoder.next();
+      match command.next() {
+        Some(steps) => {
+          // step multiple times
+          let s = steps.parse().unwrap();
+          for i in 1..=s {
+            print!("Step {}: ", i);
+            print_instruction(decoder.next());
+          }
         }
-      } else {
-        decoder.next();
+        _ => {
+          print_instruction(decoder.next());
+        }
       }
       // println!("Step: {:?}", command.next());
     }
-    Some("p" | "print") => println!("Print: {:?}", command.next()),
+    Some("p" | "print") => {
+      match command.next() {
+        Some(thing) if thing == "cpu" => println!("{:?}", decoder.cpu),
+        _ => {}
+      }
+      println!("Print: {:?}", command.next());
+    }
     Some("q" | "quit") => println!("Quit: {:?}", command.next()),
     Some("g" | "goto") => println!("Goto: {:?}", command.next()),
     Some(unknown) => println!("unknown command, {:?}", unknown),
