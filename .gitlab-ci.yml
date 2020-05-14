@@ -47,7 +47,7 @@ test:cargo:
   script:
     - rustc --version && cargo --version # Print version info for debugging
     - export CARGO_INCREMENTAL=0
-    - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads"
+    - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
     - cargo test --verbose $CARGO_OPTIONS
     # make it a vaild json
     # - ./format_json.sh test_results.json
@@ -88,7 +88,7 @@ coverage:cargo:
   script:
     - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
     - export CARGO_INCREMENTAL=0
-    - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads"
+    - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
     - cargo test --verbose $CARGO_OPTIONS
     - |
       zip -0 ccov.zip `find . \( -name "superrustendo*.gc*" \) -print`;
