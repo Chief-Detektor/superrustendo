@@ -1,3 +1,4 @@
+use crate::cpu::address::Address;
 use crate::cpu::addressmodes::{
   get_gi_addr_mode, get_gii_addr_mode, get_gii_reg_load_addr_mode, AddressModes,
 };
@@ -431,7 +432,7 @@ fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
 #[derive(Debug)]
 pub struct Decoder<'t> {
   instructions: Vec<Instruction>,
-  pub(crate) cpu: &'t mut CPU,
+  pub cpu: &'t mut CPU,
   mapper: &'t mut Mapper,
   follow_jumps: bool,
 }
@@ -502,17 +503,13 @@ impl Iterator for Decoder<'_> {
   type Item = Instruction;
 
   fn next(&mut self) -> Option<Instruction> {
-    // Put this in seperate Function >>>
-    // let foo = self.mapper[self.cpu.regs.PC as _];
-    // println!("Mapper in decoder: {:x}", foo);
+    // TODO: Evaluate this
+    let address = Address {
+      bank: self.cpu.regs.PBR,
+      address: self.cpu.regs.PC,
+    };
     let inst = self
-      .decode(
-        self
-          .mapper
-          .read(self.cpu.regs.PC as usize)
-          .try_into()
-          .unwrap(),
-      )
+      .decode(self.mapper.read(address).try_into().unwrap())
       .unwrap();
 
     let payload = self.mapper.cartridge.as_ref().unwrap().read_bytes(

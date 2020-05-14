@@ -1,7 +1,9 @@
+use super::address::Address;
 use super::constants::*;
 use super::decoder::Opcodes;
 use super::Registers;
 use super::CPU;
+use crate::mem::Mapper;
 use std::convert::TryInto;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -98,22 +100,32 @@ impl AddressModes {
     }
   }
 
-  pub fn get_effective_address(&self, cpu: &mut CPU, payload: &Vec<u8>, opcode: &Opcodes) -> usize {
+  pub fn get_effective_address(
+    &self,
+    cpu: &mut CPU,
+    payload: &Vec<u8>,
+    opcode: &Opcodes,
+    mapper: &Mapper,
+  ) -> Option<Address> {
+    let mut address = Address {
+      bank: 0,
+      address: 0,
+    };
     match &self {
       AddressModes::Absolute => {
-        let bank;
         if *opcode == Opcodes::JMP || *opcode == Opcodes::JSR {
-          println!("Transfer control");
-          bank = cpu.regs.PBR;
+          // println!("Transfer control");
+          address.bank = cpu.regs.PBR;
         } else {
-          println!("Datamove");
-          bank = cpu.regs.DBR;
+          // println!("Datamove");
+          address.bank = cpu.regs.DBR;
         }
 
         let data = payload.as_slice();
-        println!("### Data, yo: {:?} Bank: {:x}", data, bank);
+        address.address = (data[1] as u16) << 8 | data[0] as u16;
+        // println!("### Data, yo: {:?} Bank: {:x}", data, bank);
 
-        return ((bank as usize) << 16 | (data[1] as usize) << 8 | data[0] as usize) as usize;
+        return Some(address);
       }
       // AddressModes::AbsoluteIndexedX => {
       // unimplemented!();
@@ -134,18 +146,19 @@ impl AddressModes {
       AddressModes::AbsoluteLong => {
         let op_low = payload[0];
         let op_high = payload[1];
-        let op_bank = payload[2];
-        return ((op_bank as u32) << 16 | (op_high as u32) << 8 | op_low as u32)
-          .try_into()
-          .unwrap();
+        address.address = (op_high as u16) << 8 | op_low as u16;
+        address.bank = payload[2];
+        return Some(address);
       }
       AddressModes::Implied => println!("Implied addressing"),
       AddressModes::Immediate => println!("Immediate addressing"), // TODO: Return Payload as slice?
       AddressModes::ProgrammCounterRelative => {
         let offset: i8 = payload[0] as _;
         let foo = offset as i16;
-        let address: u32 = (foo as i32 + (cpu.regs.PC as i32)).try_into().unwrap();
-        return (((cpu.regs.PBR as u32) << 16) | address) as usize;
+        address.address = (foo as i32 + (cpu.regs.PC as i32)).try_into().unwrap();
+        address.bank = cpu.regs.PBR;
+        // return (((cpu.regs.PBR as u32) << 16) | address) as usize;
+        return Some(address);
       }
       AddressModes::StackPCRelativeLong => {
         let op_low = payload[0];
@@ -153,15 +166,35 @@ impl AddressModes {
         cpu.stack_push((address & 0x00ff) as u8);
         cpu.stack_push(((address & 0xff00) >> 8) as u8);
       }
-      // TODO: Should this go to RTS instruction instead?
-      AddressModes::StackRTS => {
-        let op_low = cpu.stack_pull();
-        let op_high = cpu.stack_pull();
-        cpu.regs.PC = ((op_high as u16) << 8) | op_low as u16;
+      AddressModes::StackInterrupt => {
+        if !cpu.e {
+          cpu.stack_push(cpu.regs.PBR);
+        }
+        let pc_high = (cpu.regs.PC >> 8) as u8;
+        let pc_low = (cpu.regs.PC & 0xff) as u8;
+        cpu.stack_push(pc_high);
+        cpu.stack_push(pc_low);
+        cpu.stack_push(cpu.regs.P.into());
+
+        // TODO: Eval this
+        let interrupt_vector;
+        if !cpu.e {
+          interrupt_vector = mapper.cartridge.as_ref().unwrap().header.native_irq;
+        } else {
+          interrupt_vector = mapper.cartridge.as_ref().unwrap().header.emu_irq;
+        }
+        let load_address = Address {
+          bank: 0,
+          address: interrupt_vector,
+        };
+        let val_low = mapper.read(load_address);
+        let val_high = mapper.read(load_address.add(1));
+
+        address.address = (val_high as u16) << 8 | val_low as u16;
+        return Some(address);
       }
-      // AddressModes::StackInterrupt => {
-      //   // TODO
-      // }
+      AddressModes::StackRTS => {}
+      AddressModes::StackPush => {}
       _ => {
         unimplemented!(
           "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
@@ -171,7 +204,7 @@ impl AddressModes {
         );
       }
     };
-    0
+    None
   }
 }
 

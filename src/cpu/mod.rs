@@ -3,6 +3,7 @@ use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByt
 use std::convert::From;
 use std::fmt;
 
+pub mod address;
 pub mod addressmodes;
 pub mod constants;
 pub mod decoder;
@@ -232,7 +233,7 @@ impl CPU {
 
   pub fn stack_push(&mut self, payload: u8) {
     let index = <u16>::from(self.regs.S);
-    println!("Pushing {:x} to address {:x}", payload, index);
+    println!("Pushing {:x} on stack address {:x}", payload, index);
 
     let mut new_index: i32 = index as i32 - 1;
 
@@ -252,6 +253,7 @@ impl CPU {
       new_index = 0;
     }
     self.regs.S = IndexRegister::from(new_index as u16);
+    println!("Popping {:x} from Stack", ret);
     ret
   }
 }
