@@ -109,7 +109,7 @@ coverage:cargo:
 
 pages:
   tags:
-    - arch-vm-shell
+    - docker
   stage: deploy
   dependencies:
     - coverage:cargo
