@@ -461,6 +461,11 @@ impl<'t> Decoder<'t> {
     decoder
   }
 
+  pub fn execute_instruction(&mut self, instruction: &mut Instruction) {
+    println!("Executing: {:?}", instruction);
+    instruction.execute(self.cpu, self.mapper);
+  }
+
   /// # Examples
   ///
   /// ```

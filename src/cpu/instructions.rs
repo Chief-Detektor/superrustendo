@@ -12,10 +12,10 @@ pub struct Instruction {
   pub address: u32,
   pub opcode: Opcodes,
   pub address_mode: AddressModes,
-  pub(crate) length: usize,
+  pub length: usize,
   pub payload: Vec<u8>,
-  cycles: usize,
-  follow_jumps: bool,
+  pub cycles: usize,
+  pub follow_jumps: bool,
 }
 
 impl Instruction {
