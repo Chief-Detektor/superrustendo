@@ -51,7 +51,9 @@ fn main() -> Result<()> {
     match readline {
       Ok(line) => {
         // println!("Line: {:?}", line);
-        eval_line(line, &mut decoder);
+        if !eval_line(line, &mut decoder){
+          break;
+        }
       }
       Err(ReadlineError::Interrupted) => break,
       Err(_) => println!("No input"),
@@ -69,7 +71,7 @@ fn print_instruction(inst: Option<Instruction>) {
   );
 }
 
-fn eval_line(line: String, decoder: &mut Decoder) {
+fn eval_line(line: String, decoder: &mut Decoder) -> bool{
   let mut command = line.split_whitespace();
   match command.next() {
     Some("s" | "step") => {
@@ -95,9 +97,14 @@ fn eval_line(line: String, decoder: &mut Decoder) {
       }
       println!("Print: {:?}", command.next());
     }
-    Some("q" | "quit") => println!("Quit: {:?}", command.next()),
+    Some("q" | "quit") => {
+      println!("Quit");
+      return false;
+    },
     Some("g" | "goto") => println!("Goto: {:?}", command.next()),
     Some(unknown) => println!("unknown command, {:?}", unknown),
     None => {}
   }
+
+  return true;
 }

@@ -32,14 +32,14 @@ impl Default for Stack {
 bitfields!(
   #[derive(PartialEq, Copy, Clone)]
   pub StatusRegister: u8 {
-      c: 1, // CarryBit / Emulation Mode
-      z: 1, // Result Zero
-      i: 1, // IRQ Disable
-      d: 1, // Decimal Mde
-      x: 1, // Index Register Select/Break Instruction
-      m: 1, // Memory/Accumulator Select
-      v: 1, // Overflow
-      n: 1, // Negative
+      pub c: 1, // CarryBit / Emulation Mode
+      pub z: 1, // Result Zero
+      pub i: 1, // IRQ Disable
+      pub d: 1, // Decimal Mde
+      pub x: 1, // Index Register Select/Break Instruction
+      pub m: 1, // Memory/Accumulator Select
+      pub v: 1, // Overflow
+      pub n: 1, // Negative
    }
 );
 
@@ -188,12 +188,12 @@ impl IndexRegister {
 #[derive(ByteStruct, PartialEq, Debug, Clone, Copy)]
 #[byte_struct_le]
 pub struct Registers {
-  P: StatusRegister,
-  C: Accumulator,
-  X: IndexRegister, // X Index Register,
-  Y: IndexRegister, // Y Index Register,
-  D: u16,           // Direct Page Register
-  S: IndexRegister, // Stack Pointer (or 24 bits?)
+  pub P: StatusRegister,
+  pub C: Accumulator,
+  pub X: IndexRegister, // X Index Register,
+  pub Y: IndexRegister, // Y Index Register,
+  pub D: u16,           // Direct Page Register
+  pub S: IndexRegister, // Stack Pointer (or 24 bits?)
   pub PBR: u8,      // Programm Bank Register
   pub DBR: u8,      // Data Bank Register
   pub PC: u16,      // Programm Counter
