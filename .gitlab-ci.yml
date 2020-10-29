@@ -1,7 +1,7 @@
 # This file is a template, and might need editing before it works on your project.
 # Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/rust/tags/
-image: "rust:latest"
+image: "rust:buster"
 
 # Optional: Pick zero or more services to be used on all builds.
 # Only needed when using a docker container to run your tests in.
@@ -19,8 +19,10 @@ image: "rust:latest"
 
 # Use cargo to test the project
 before_script:
-  # - rustup update nightly && rustup default nightly
+  - rustup update nightly && rustup default nightly
   - rustup default nightly
+  - apt-get update -yqq
+  - apt-get install -yqq --no-install-recommends zip lcov
 
 stages:
   - setup
@@ -37,7 +39,8 @@ prepare:
       - target/debug/deps
       - target/release/deps
   script:
-    - cargo build
+    - rustup update
+    # - cargo build +nightly
 
 test:cargo:
   stage: test
@@ -45,26 +48,28 @@ test:cargo:
     - docker
   script:
     - rustc --version && cargo --version # Print version info for debugging
-    - cargo test -v --all -- -Z unstable-options --format=json > test_results.json
+    - export CARGO_INCREMENTAL=0
+    - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
+    - cargo test --verbose $CARGO_OPTIONS
     # make it a vaild json
-    - ./format_json.sh test_results.json
+    # - ./format_json.sh test_results.json
   cache:
     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
     paths:
       - target/debug/deps
       - target/release/deps
     policy: pull
-  artifacts:
-    paths:
-      - test_results.json
-    expire_in: 30 days
+    # artifacts:
+    #   paths:
+    #     - test_results.json
+    # expire_in: 30 days
 
 benchmark:cargo:
   stage: test
   tags:
     - docker
   script:
-    - cargo bench -v -- -Z unstable-options --format=json > bench_results.json
+    - cargo bench +nightly -v -- -Z unstable-options --format=json > bench_results.json
     # again vaild json..
     - ./format_json.sh bench_results.json
   cache:
@@ -81,12 +86,16 @@ benchmark:cargo:
 coverage:cargo:
   stage: test
   tags:
-    - arch-vm-shell
+    - docker
   script:
-    - "RUSTFLAGS='-C link-dead-code' cargo test --no-run"
-    - kcov --exclude-pattern=/.cargo/,/usr/lib --verify target/cov `ls target/debug/decoder-* | head -n1`
-    # - find target/cov -xtype l -delete
-    - echo `./show_coverage.sh`
+    - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
+    - export CARGO_INCREMENTAL=0
+    - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
+    - cargo test --verbose $CARGO_OPTIONS
+    - |
+      zip -0 ccov.zip `find . \( -name "superrustendo*.gc*" \) -print`;
+      ./grcov ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info;
+    - genhtml lcov.info -o target/cov
   cache:
     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
     paths:
@@ -104,13 +113,11 @@ pages:
   stage: deploy
   dependencies:
     - coverage:cargo
-    - test:cargo
-    - benchmark:cargo
   script:
-    - find target/cov -xtype l -delete
+    # - find target/cov -xtype l -delete
     - mv target/cov public
-    - mv test_results.json public
-    - mv bench_results.json public
+    # - mv test_results.json public
+    # - mv bench_results.json public
   artifacts:
     paths:
       - public
