@@ -3,7 +3,7 @@ use std::env;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 
-use superrustendo::cartridge::Cartridge;
+use superrustendo::{cartridge::Cartridge, mem::WRAM};
 use superrustendo::cpu::decoder::*;
 use superrustendo::cpu::*;
 use superrustendo::mem::Mapper;
@@ -27,6 +27,7 @@ fn main() -> std::io::Result<()> {
     // TODO: Fix address offsets => rom mapping starts at 0x8000.. for bank 00
     let mut mapper = Mapper {
         cartridge: Some(card),
+        wram: WRAM::new()
     };
 
     let decoder = Decoder::new(&mut cpu, &mut mapper, true);

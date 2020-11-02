@@ -429,7 +429,7 @@ fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
     }
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Decoder<'t> {
     instructions: Vec<Instruction>,
     pub cpu: &'t mut CPU,
@@ -472,12 +472,12 @@ impl<'t> Decoder<'t> {
     /// use superrustendo::cpu::addressmodes::AddressModes;
     ///
     /// use superrustendo::cpu::decoder::{ Decoder, Opcodes};
-    /// use superrustendo::mem::Mapper;
+    /// use superrustendo::mem::{Mapper, WRAM};
     /// use superrustendo::cpu::{Accumulator, CPU, IndexRegister, Registers, StatusRegister};
     /// use std::convert::TryInto;
     ///
     /// let mut c = CPU::new();
-    /// let mut m = Mapper { cartridge: None };
+    /// let mut m = Mapper { cartridge: None, wram: WRAM::new()};
     /// let d = Decoder::new(&mut c, &mut m, /* follow_jumps */ false);
     /// let result = d.decode(0x3d);
     /// let res = result.unwrap();

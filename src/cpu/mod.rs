@@ -44,61 +44,62 @@ bitfields!(
 );
 
 impl StatusRegister {
-  pub fn get_c(&self) -> u8 {
-    return self.c
-  }
-  pub fn get_z(&self) -> u8 {
-    return self.z
-  }
-  pub fn get_i(&self) -> u8 {
-    return self.i
-  }
-  pub fn get_d(&self) -> u8 { 
-    return self.d
-  }
-  pub fn get_x(&self) -> u8 {
-    return self.x
-  }
-  pub fn get_m(&self) -> u8 {
-    return self.m
-  }
-  pub fn get_v(&self) -> u8 {
-    return self.v
-  }
-  pub fn get_n(&self) -> u8 {
-    return self.n
-  }
-  pub fn get_b(&self) -> u8 {
-    return self.get_x()
-  }
+    pub fn get_c(&self) -> u8 {
+        return self.c;
+    }
+    pub fn get_z(&self) -> u8 {
+        return self.z;
+    }
+    pub fn get_i(&self) -> u8 {
+        return self.i;
+    }
+    pub fn get_d(&self) -> u8 {
+        return self.d;
+    }
+    pub fn get_x(&self) -> u8 {
+        return self.x;
+    }
+    pub fn get_m(&self) -> u8 {
+        return self.m;
+    }
+    pub fn get_v(&self) -> u8 {
+        return self.v;
+    }
+    pub fn get_n(&self) -> u8 {
+        return self.n;
+    }
+    pub fn get_b(&self) -> u8 {
+        return self.get_x();
+    }
 
-  pub fn set_c(&mut self, value: u8) {
-    self.c = value;
-  }
-  pub fn set_z(&mut self, value: u8) {
-    self.z = value;
-  }
-  pub fn set_i(&mut self, value: u8) {
-    self.i = value;
-  }
-  pub fn set_d(&mut self, value: u8) {
-    self.d = value;
-  }
-  pub fn set_x(&mut self, value: u8) {
-    self.x = value;
-  }
-  pub fn set_m(&mut self, value: u8) {
-    self.m = value;
-  }
-  pub fn set_v(&mut self, value: u8) {
-    self.v = value;
-  }
-  pub fn set_n(&mut self, value: u8) {
-    self.n = value;
-  }
-  pub fn set_b(&mut self, value: u8) {
-    self.set_x(value);
-  }}
+    pub fn set_c(&mut self, value: u8) {
+        self.c = value;
+    }
+    pub fn set_z(&mut self, value: u8) {
+        self.z = value;
+    }
+    pub fn set_i(&mut self, value: u8) {
+        self.i = value;
+    }
+    pub fn set_d(&mut self, value: u8) {
+        self.d = value;
+    }
+    pub fn set_x(&mut self, value: u8) {
+        self.x = value;
+    }
+    pub fn set_m(&mut self, value: u8) {
+        self.m = value;
+    }
+    pub fn set_v(&mut self, value: u8) {
+        self.v = value;
+    }
+    pub fn set_n(&mut self, value: u8) {
+        self.n = value;
+    }
+    pub fn set_b(&mut self, value: u8) {
+        self.set_x(value);
+    }
+}
 
 // NOTE: This is because default Debug prints the single bits in reverse order, which sucks to debug
 impl fmt::Debug for StatusRegister {
@@ -239,6 +240,20 @@ impl IndexRegister {
             high: 0xff,
         }
     }
+    pub fn get_low(&self) -> u8 {
+        return self.low as u8;
+    }
+    pub fn get_high(&self) -> u8 {
+        return self.high as u8;
+    }
+    pub fn set_low(&mut self, low: u8) -> &mut Self {
+        self.low = low.into();
+        self
+    }
+    pub fn set_high(&mut self, high: u8) -> &mut Self {
+        self.high = high.into();
+        self
+    }
 }
 
 // TODO: Proper inital state
@@ -257,52 +272,61 @@ pub struct Registers {
 }
 
 impl Registers {
-  // Setters
-    pub fn set_P(&mut self, P: StatusRegister) {
-        self.P = P;
+    // Setters
+    pub fn set_P(&mut self, P: &StatusRegister) -> &mut Self {
+        self.P = *P;
+        self
     }
-    pub fn set_C(&mut self, C: Accumulator) {
-        self.C = C;
+    pub fn set_C(&mut self, C: &Accumulator) -> &mut Self {
+        self.C = *C;
+        self
     }
-    pub fn set_X(&mut self, X: IndexRegister)  {
-        self.X = X;
+    pub fn set_X(&mut self, X: &IndexRegister) -> &mut Self {
+        self.X = *X;
+        self
     }
-    pub fn set_Y(&mut self, Y: IndexRegister)  {
-        self.Y = Y;
+    pub fn set_Y(&mut self, Y: &IndexRegister) -> &mut Self {
+        self.Y = *Y;
+        self
     }
-    pub fn set_D(&mut self, D: u16) {
-        self.D = D;
+    pub fn set_D(&mut self, D: &u16) -> &mut Self {
+        self.D = *D;
+        self
     }
-    pub fn set_S(&mut self, S: IndexRegister) {
-        self.S = S;
+    pub fn set_S(&mut self, S: &IndexRegister) -> &mut Self {
+        self.S = *S;
+        self
     }
-    pub fn set_PBR(&mut self, PBR: u8) {
-        self.PBR = PBR;
+    pub fn set_PBR(&mut self, PBR: &u8) -> &mut Self {
+        self.PBR = *PBR;
+        self
     }
-    pub fn set_DBR(&mut self, DBR: u8) {
-        self.DBR = DBR;
+    pub fn set_DBR(&mut self, DBR: &u8) -> &mut Self {
+        self.DBR = *DBR;
+        self
     }
-    pub fn set_PC(&mut self, PC: u16) {
-        self.PC = PC;
+    pub fn set_PC(&mut self, PC: &u16) -> &mut Self {
+        self.PC = *PC;
+        self
     }
-  // Getters
-    pub fn get_P(&self) -> StatusRegister {
-        return self.P;
+    // Getters
+    pub fn get_P(&mut self) -> &mut StatusRegister {
+        return &mut self.P;
     }
-    pub fn get_C(&self) -> Accumulator {
-        return self.C;
+    pub fn get_C(&mut self) -> &mut Accumulator {
+        return &mut self.C;
     }
-    pub fn get_X(&self) -> IndexRegister {
-        return self.X;
+    pub fn get_X(&mut self) -> &mut IndexRegister {
+        return &mut self.X;
     }
-    pub fn get_Y(&self) -> IndexRegister {
-        return self.Y;
+    pub fn get_Y(&mut self) -> &mut IndexRegister {
+        return &mut self.Y;
     }
     pub fn get_D(&self) -> u16 {
         return self.D;
     }
-    pub fn get_S(&self) -> IndexRegister {
-        return self.S;
+    pub fn get_S(&mut self) -> &mut IndexRegister {
+        return &mut self.S;
     }
     pub fn get_PBR(&self) -> u8 {
         return self.PBR;
@@ -347,21 +371,20 @@ impl CPU {
         }
     }
 
-    pub fn get_regs(&self) -> Registers {
-      return self.regs
+    pub fn get_regs(&mut self) -> &mut Registers {
+        return &mut self.regs;
     }
 
     pub fn get_emulation_mode(&self) -> bool {
-      return self.e
+        return self.e;
     }
-    pub fn set_regs(&mut self, regs: Registers) {
-      self.regs = regs;
-    }
-
-    pub fn set_emulation_mode(&mut self, e: bool)  {
-      self.e = e;
+    pub fn set_regs(&mut self, regs: &Registers) {
+        self.regs = *regs;
     }
 
+    pub fn set_emulation_mode(&mut self, e: bool) {
+        self.e = e;
+    }
 
     pub fn stack_push(&mut self, payload: u8) {
         let index = <u16>::from(self.regs.S);

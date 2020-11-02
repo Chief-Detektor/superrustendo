@@ -7,6 +7,8 @@ use crate::mem::Mapper;
 
 use std::convert::TryInto;
 
+use super::address::Address;
+
 #[derive(Debug, Default, Clone)]
 pub struct Instruction {
     pub address: u32,
@@ -29,14 +31,131 @@ impl Instruction {
             self.address_mode
                 .get_effective_address(&mut cpu, &self.payload, &self.opcode, &mapper);
 
-        println!("Calculated effective address: {:?}", effective_address);
+        if effective_address.is_some() {
+            println!("Calculated effective address: {:?}", effective_address);
+        }
+
         match &self.opcode {
+            Opcodes::AND => {
+                if cpu.e || cpu.regs.P.m == 1 {
+                    let val = mapper.read(effective_address.unwrap());
+                    cpu.regs.C = Accumulator::from(cpu.regs.C.A & val as u16);
+                } else {
+                    let low = mapper.read(effective_address.unwrap());
+                    let high = mapper.read(effective_address.unwrap().add(1));
+                    cpu.regs.C = Accumulator::from(
+                        u16::from(cpu.regs.C) & (low as u16 | (high as u16) << 8),
+                    );
+                }
+                if u16::from(cpu.regs.C) >> 15 == 1 {
+                    cpu.regs.P.n = 1;
+                } else {
+                    cpu.regs.P.n = 0;
+                }
+                if u16::from(cpu.regs.C) == 0 {
+                    cpu.regs.P.z = 1;
+                } else {
+                    cpu.regs.P.z = 0;
+                }
+            }
+            // TODO: test this
+            Opcodes::ADC => {
+                // TODO: Decimal flag
+                if cpu.regs.P.m == 1 {
+                    // 8-Bit
+                    if cpu.regs.C.A as u16 + (mapper.read(effective_address.unwrap()) as u16) > 255
+                    {
+                        cpu.regs.P.v = 1;
+                    }
+                    let mut data =
+                        (cpu.regs.C.A as u8).wrapping_add(mapper.read(effective_address.unwrap()));
+                    if cpu.regs.P.c == 0 {
+                        data += 1;
+                    }
+                    if data == 0 {
+                        cpu.regs.P.z = 1;
+                    } else {
+                        cpu.regs.P.z = 0;
+                    }
+                    if data >> 7 == 1 {
+                        cpu.regs.P.n = 1
+                    } else {
+                        cpu.regs.P.n = 0;
+                    }
+                    cpu.regs.C.A = data as u16;
+                } else {
+                    let mut data_low = mapper.read(effective_address.unwrap());
+                    let mut data_high = mapper.read(effective_address.unwrap().add(1));
+                    if cpu.regs.C.A as u16 + (data_low as u16) > 255 {
+                        // borrow required
+                        data_high += 1;
+                        cpu.regs.P.c = 0;
+                        cpu.regs.C.A = cpu.regs.C.A.wrapping_add(data_low.into());
+                        cpu.regs.C.B = cpu.regs.C.B.wrapping_add(data_high.into());
+
+                        if u16::from(cpu.regs.C) == 0 {
+                            cpu.regs.P.z = 1;
+                        } else {
+                            cpu.regs.P.z = 0;
+                        }
+                        if u16::from(cpu.regs.C) >> 15 == 1 {
+                            cpu.regs.P.n = 1;
+                        } else {
+                            cpu.regs.P.n = 0;
+                        }
+                        cpu.regs.P.v = 1;
+                    } else {
+                        cpu.regs.P.c = 1;
+                        cpu.regs.C.A = cpu.regs.C.A.wrapping_add(data_low.into());
+                        cpu.regs.C.B = cpu.regs.C.B.wrapping_add(data_high.into());
+
+                        if u16::from(cpu.regs.C) == 0 {
+                            cpu.regs.P.z = 1;
+                        } else {
+                            cpu.regs.P.z = 0;
+                        }
+                        if u16::from(cpu.regs.C) >> 15 == 1 {
+                            cpu.regs.P.n = 1;
+                        } else {
+                            cpu.regs.P.n = 0;
+                        }
+                        cpu.regs.P.v = 0;
+                    }
+                }
+            }
             Opcodes::BRK => {
                 // cpu.regs.PC += 2;
                 // TODO: Eval this..
                 cpu.regs.PC = effective_address.unwrap().address;
             }
             Opcodes::CLD => cpu.regs.P.d = 0,
+            Opcodes::CMP => {
+                let val;
+                if cpu.e || cpu.regs.P.m == 1 {
+                    val = u16::from(cpu.regs.C) - mapper.read(effective_address.unwrap()) as u16;
+                } else {
+                    val = u16::from(cpu.regs.C)
+                        - (mapper.read(effective_address.unwrap()) as u16
+                            | (mapper.read(effective_address.unwrap().add(1)) as u16) << 8);
+                }
+                let res = u16::from(cpu.regs.C) - val;
+
+                if res >> 15 == 1 {
+                    cpu.regs.P.n = 1;
+                } else {
+                    cpu.regs.P.n = 0;
+                }
+                if res == 0 {
+                    cpu.regs.P.z = 1;
+                } else {
+                    cpu.regs.P.z = 0;
+                }
+                if u16::from(cpu.regs.C) >= val {
+                    cpu.regs.P.c = 1;
+                } else {
+                    cpu.regs.P.c = 0;
+                }
+            }
             Opcodes::SEI => {
                 cpu.regs.P.i = 1;
             }
@@ -77,7 +196,7 @@ impl Instruction {
                     } else {
                         val = self.payload[1] as u16 | ((self.payload[0] as u16) << 8);
                     }
-                    let bar = <u16>::from(cpu.regs.X) - val;
+                    let bar = <u16>::from(cpu.regs.X).wrapping_sub(val);
                     if bar >> 15 == 1 {
                         cpu.regs.P.n = 1;
                     } else {
@@ -124,19 +243,17 @@ impl Instruction {
             Opcodes::PHB => cpu.stack_push(cpu.regs.DBR),
             Opcodes::LDX => {
                 if cpu.regs.P.x != 1 {
-                    // TODO: use effective_address here
-                    let load_address = self.payload[1] as u16 | (self.payload[0] as u16) << 8;
-
                     let mut val = 0;
                     if self.address_mode == AddressModes::Immediate {
-                        val = load_address;
+                        val = effective_address.unwrap().address;
                     } else {
                         val = mapper
                             .cartridge
                             .as_ref()
                             .unwrap()
-                            .read_u16(load_address.try_into().unwrap());
+                            .read_u16(effective_address.unwrap().address as usize);
                     }
+
                     // Set cpu flags accordingly
                     if val == 0 {
                         cpu.regs.P.z = 1;
@@ -179,6 +296,61 @@ impl Instruction {
                     cpu.regs.X = IndexRegister::from(val);
                 }
             }
+            Opcodes::LDY => {
+                if cpu.regs.P.x != 1 {
+                    let mut val = 0;
+                    if self.address_mode == AddressModes::Immediate {
+                        val = effective_address.unwrap().address;
+                    } else {
+                        val = mapper
+                            .cartridge
+                            .as_ref()
+                            .unwrap()
+                            .read_u16(effective_address.unwrap().address as usize);
+                    }
+
+                    // Set cpu flags accordingly
+                    if val == 0 {
+                        cpu.regs.P.z = 1;
+                    } else {
+                        cpu.regs.P.z = 0;
+                    }
+
+                    if (val >> 7) == 1 {
+                        cpu.regs.P.n = 1;
+                    } else {
+                        cpu.regs.P.n = 0;
+                    }
+
+                    cpu.regs.Y = IndexRegister::from(val);
+                } else {
+                    let load_address = self.payload[0];
+
+                    let val;
+                    if self.address_mode == AddressModes::Immediate {
+                        val = load_address;
+                    } else {
+                        val = mapper
+                            .cartridge
+                            .as_ref()
+                            .unwrap()
+                            .read_byte(load_address.try_into().unwrap());
+                    }
+                    // Set cpu flags accordingly
+                    if val == 0 {
+                        cpu.regs.P.z = 1;
+                    } else {
+                        cpu.regs.P.z = 0;
+                    }
+
+                    if (val >> 7) == 1 {
+                        cpu.regs.P.n = 1;
+                    } else {
+                        cpu.regs.P.n = 0;
+                    }
+                    cpu.regs.Y = IndexRegister::from(val);
+                }
+            }
             Opcodes::TXS => {
                 if cpu.e {
                     // TXS emu
@@ -200,6 +372,26 @@ impl Instruction {
                         // 8Bit index
                         cpu.regs.S.high = 0;
                         cpu.regs.S.low = cpu.regs.X.low;
+                    }
+                }
+            }
+            Opcodes::TXY => {
+                // 8-bit index registers
+                if cpu.regs.P.x == 1 {
+                    cpu.regs.Y.low = cpu.regs.X.low;
+                    if cpu.regs.X.low == 0 {
+                        cpu.regs.P.z = 1;
+                    }
+                    if cpu.regs.X.low >> 7 == 1 {
+                        cpu.regs.P.n = 1;
+                    }
+                } else {
+                    cpu.regs.Y = cpu.regs.X;
+                    if cpu.regs.X.low == 0 && cpu.regs.X.high == 0 {
+                        cpu.regs.P.z = 1;
+                    }
+                    if cpu.regs.X.high >> 7 == 1 {
+                        cpu.regs.P.n = 1;
                     }
                 }
             }
@@ -239,12 +431,76 @@ impl Instruction {
                     cpu.regs.C = Accumulator::from(val);
                 }
                 // TODO: Better naming
-                let foo = mapper
-                    .cartridge
-                    .as_ref()
-                    .unwrap()
-                    .read_byte(self.payload[0] as _);
+                // let foo = mapper
+                //     .cartridge
+                //     .as_ref()
+                //     .unwrap()
+                //     .read_byte(self.payload[0] as _);
                 // println!("### Yo check da LDA, Bro: {:?}", foo);
+            }
+            // TODO: TEST this!
+            Opcodes::SBC => {
+                // TODO: Decimal flag
+                if cpu.regs.P.m == 1 || cpu.e {
+                    // 8-Bit
+                    if cpu.regs.C.A as i8 - (mapper.read(effective_address.unwrap()) as i8) < 0 {
+                        cpu.regs.P.v = 1;
+                    }
+                    let mut data =
+                        (cpu.regs.C.A as u8).wrapping_sub(mapper.read(effective_address.unwrap()));
+                    if cpu.regs.P.c == 0 {
+                        data -= 1;
+                    }
+                    if data == 0 {
+                        cpu.regs.P.z = 1;
+                    } else {
+                        cpu.regs.P.z = 0;
+                    }
+                    if data >> 7 == 1 {
+                        cpu.regs.P.n = 1
+                    } else {
+                        cpu.regs.P.n = 0;
+                    }
+                    cpu.regs.C.A = data as u16;
+                } else {
+                    let mut data_low = mapper.read(effective_address.unwrap());
+                    let mut data_high = mapper.read(effective_address.unwrap().add(1));
+                    if cpu.regs.C.A as i8 - (data_low as i8) < 0 {
+                        // borrow required
+                        data_high -= 1;
+                        cpu.regs.P.c = 0;
+                        cpu.regs.C.A = cpu.regs.C.A.wrapping_sub(data_low.into());
+                        cpu.regs.C.B = cpu.regs.C.B.wrapping_sub(data_high.into());
+
+                        if u16::from(cpu.regs.C) == 0 {
+                            cpu.regs.P.z = 1;
+                        } else {
+                            cpu.regs.P.z = 0;
+                        }
+                        if u16::from(cpu.regs.C) >> 15 == 1 {
+                            cpu.regs.P.n = 1;
+                        } else {
+                            cpu.regs.P.n = 0;
+                        }
+                        cpu.regs.P.v = 1;
+                    } else {
+                        cpu.regs.P.c = 1;
+                        cpu.regs.C.A = cpu.regs.C.A.wrapping_sub(data_low.into());
+                        cpu.regs.C.B = cpu.regs.C.B.wrapping_sub(data_high.into());
+
+                        if u16::from(cpu.regs.C) == 0 {
+                            cpu.regs.P.z = 1;
+                        } else {
+                            cpu.regs.P.z = 0;
+                        }
+                        if u16::from(cpu.regs.C) >> 15 == 1 {
+                            cpu.regs.P.n = 1;
+                        } else {
+                            cpu.regs.P.n = 0;
+                        }
+                        cpu.regs.P.v = 0;
+                    }
+                }
             }
             Opcodes::STA => {
                 // println!("STA ====>{:?}", self.payload);
@@ -300,9 +556,26 @@ impl Instruction {
                     cpu.regs.P.z = 0;
                 }
             }
+            Opcodes::TCD => {
+                cpu.regs.D = u16::from(cpu.regs.C);
+                if cpu.regs.D >> 7 == 1 {
+                    cpu.regs.P.n = 1;
+                } else {
+                    cpu.regs.P.n = 0;
+                }
+                if cpu.regs.D == 0 {
+                    cpu.regs.P.z = 1;
+                } else {
+                    cpu.regs.P.z = 0;
+                }
+            }
             Opcodes::INX => {
                 let index: u16 = u16::from(cpu.regs.X) + 1;
                 cpu.regs.X = IndexRegister::from(index);
+            }
+            Opcodes::INY => {
+                let index: u16 = u16::from(cpu.regs.Y) + 1;
+                cpu.regs.Y = IndexRegister::from(index);
             }
             Opcodes::BNE => {
                 if cpu.regs.P.z == 1 {
@@ -311,8 +584,72 @@ impl Instruction {
                     cpu.regs.PC = effective_address.unwrap().address as _;
                 }
             }
+            Opcodes::PLD => {
+                let low = cpu.stack_pull();
+                let high = cpu.stack_pull();
+                cpu.regs.D = low as u16 | (high as u16) << 8;
+
+                if cpu.regs.D == 0 {
+                    cpu.regs.P.z = 1;
+                } else {
+                    cpu.regs.P.z = 0;
+                }
+                if cpu.regs.D >> 7 == 1 {
+                    cpu.regs.P.n = 1;
+                } else {
+                    cpu.regs.P.n = 0;
+                }
+            }
             Opcodes::PHB => {
                 cpu.stack_push(cpu.regs.DBR);
+            }
+            Opcodes::PLB => {
+                cpu.regs.DBR = cpu.stack_pull();
+                if cpu.regs.DBR >> 7 == 1 {
+                    cpu.regs.P.n = 1;
+                } else {
+                    cpu.regs.P.n = 0;
+                }
+                if cpu.regs.DBR == 0 {
+                    cpu.regs.P.z = 1;
+                } else {
+                    cpu.regs.P.z = 0;
+                }
+            }
+            Opcodes::MVN => {
+                let (src_bnk, dest_bnk) = (self.payload[1], self.payload[0]);
+
+                loop {
+                    if cpu.regs.C == Accumulator::from(0xffffu16) {
+                        break;
+                    }
+                    let source = u16::from(cpu.regs.X);
+                    let dest = u16::from(cpu.regs.Y);
+                    let length = u16::from(cpu.regs.C);
+
+                    let src_address = Address {
+                        bank: src_bnk,
+                        address: source,
+                    };
+                    let val = mapper.read(src_address);
+                    let dest_address = Address {
+                        bank: dest_bnk,
+                        address: dest,
+                    };
+                    mapper.write(dest_address, val);
+
+                    // print!("{:x} : {:?}|", val, address);
+                    cpu.regs.X = IndexRegister::from(u16::from(cpu.regs.X) + 1);
+                    cpu.regs.Y = IndexRegister::from(u16::from(cpu.regs.Y) + 1);
+                    cpu.regs.C = Accumulator::from(u16::from(cpu.regs.C).wrapping_sub(1));
+                }
+
+                // panic!("src: {} : {} dest: {} : {} count: {}", src_bnk, source, dest_bnk, dest, length);/
+            }
+            Opcodes::XBA => {
+                let temp = cpu.regs.C.B;
+                cpu.regs.C.B = cpu.regs.C.A;
+                cpu.regs.C.A = temp;
             }
             // Opcodes::ORA => {
             //   if cpu.regs.P.m != 1 {
