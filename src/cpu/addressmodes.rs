@@ -127,22 +127,77 @@ impl AddressModes {
 
                 return Some(address);
             }
-            // AddressModes::AbsoluteIndexedX => {
-            // unimplemented!();
-            // let data = payload.as_slice();
+            AddressModes::AbsoluteIndexedY => {
+                address.bank = cpu.regs.DBR;
+                if cpu.regs.P.x == 1 {
+                    if (payload[0] as u32 | (payload[1] as u32) << 8) + cpu.regs.Y.low as u32
+                        > 0xffff
+                    {
+                        address.bank += 1;
+                        address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
+                            .wrapping_add(cpu.regs.Y.low);
+                    } else {
+                        address.address =
+                            (payload[0] as u16 | (payload[1] as u16) << 8) + cpu.regs.Y.low;
+                    }
+                } else {
+                    if (payload[0] as u32 | (payload[1] as u32) << 8) + u16::from(cpu.regs.Y) as u32
+                        > 0xffff
+                    {
+                        address.bank += 1;
+                        address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
+                            .wrapping_add(u16::from(cpu.regs.Y));
+                    } else {
+                        address.address =
+                            (payload[0] as u16 | (payload[1] as u16) << 8) + u16::from(cpu.regs.Y);
+                    }
+                }
+                return Some(address);
+            }
+            AddressModes::AbsoluteLongIndexedX => {
+                let data = payload.as_slice();
 
-            // let mut number = (cpu.regs.DBR as u32) << 16 | (data[1] as u32) << 8 | data[0] as u32;
+                let bank = data[2];
+                let mut addr = (data[1] as u16) << 8 | data[0] as u16;
 
-            // if !cpu.e && cpu.regs.P.x == 0 {
-            //   // 16Bit
-            //   // TODO: byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le
-            //   number += cpu.regs.X as u16;
-            // } else {
-            //   // 8Bit
-            //   number += cpu.regs.X.low as u32;
-            // }
-            // return number as usize;
-            // }
+                if cpu.regs.P.x == 0 {
+                    addr += u16::from(cpu.regs.X);
+                } else {
+                    addr += cpu.regs.X.get_low() as u16;
+                }
+
+                address.bank = bank;
+                address.address = addr;
+                return Some(address);
+            }
+            AddressModes::AbsoluteIndexedIndirect => {
+                let op_low = payload[0];
+                let op_high = payload[1];
+
+                let x;
+                if cpu.regs.P.x == 1 || cpu.e {
+                    x = cpu.regs.X.low;
+                } else {
+                    x = u16::from(cpu.regs.X);
+                }
+                // TODO: increment bank on overflow like AbsoluteIndexed/XY?
+                let mut indirect_address = op_low as u16 | (op_high as u16) << 8;
+                // indirect_address += x;
+                if indirect_address as u32 + x as u32 > 0xffff {
+                    address.bank = cpu.regs.PBR /*+ 1*/;
+                    indirect_address = indirect_address.wrapping_add(x);
+                } else {
+                    address.bank = cpu.regs.PBR;
+                    indirect_address += x;
+                }
+
+                let addresss_low = mapper.read(address);
+                let addresss_high = mapper.read(address.add(1));
+
+                // cpu.regs.PC = (cpu.regs.PBR as u32) << 16 | (addresss_high as u32) << 8 | addresss_low as u32;
+                address.address = (addresss_high as u16) << 8 | addresss_low as u16;
+                return Some(address);
+            }
             AddressModes::AbsoluteLong => {
                 let op_low = payload[0];
                 let op_high = payload[1];
@@ -151,7 +206,15 @@ impl AddressModes {
                 return Some(address);
             }
             AddressModes::Implied => println!("Implied addressing"),
-            AddressModes::Immediate => println!("Immediate addressing"), // TODO: Return Payload as slice?
+            AddressModes::Immediate => {
+                println!("Immediate addressing");
+                if !cpu.e && (cpu.regs.P.m == 0 || cpu.regs.P.x == 0) && payload.capacity() == 2 {
+                    address.address = payload[0] as u16 | (payload[1] as u16) << 8;
+                } else {
+                    address.address = payload[0] as u16;
+                }
+                return Some(address);
+            } // TODO: Return Payload as slice?
             AddressModes::ProgrammCounterRelative => {
                 let offset: i8 = payload[0] as _;
                 let foo = offset as i16;
@@ -195,6 +258,36 @@ impl AddressModes {
             }
             AddressModes::StackRTS => {}
             AddressModes::StackPush => {}
+            AddressModes::StackPull => {}
+            AddressModes::StackAbsolute => {}
+            AddressModes::DirectPage => {
+                address.address = u16::from(cpu.regs.D) + payload[0] as u16;
+                return Some(address);
+            }
+            AddressModes::DirectPageIndirect => {
+                let val = payload[0] as u16 + cpu.regs.D;
+                let addr_low = mapper.read(Address {
+                    bank: 0,
+                    address: val,
+                });
+                let addr_high = mapper.read(
+                    Address {
+                        bank: 0,
+                        address: val,
+                    }
+                    .add(1),
+                );
+
+                address.bank = cpu.regs.DBR;
+                address.address = addr_low as u16 | (addr_high as u16) << 8;
+                return Some(address);
+            }
+            AddressModes::BlockMove => {
+                println!(
+                    "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
+                    self, opcode, cpu.regs
+                );
+            }
             _ => {
                 unimplemented!(
                     "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",

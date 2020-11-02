@@ -8,19 +8,33 @@ pub struct WRAM {
     highRam: [u8; 0x6000], // 0x7e
 }
 
+impl WRAM {
+    pub fn new() -> Self {
+        WRAM {
+            lowRam: [0; 0x2000],
+            highRam: [0; 0x6000],
+        }
+    }
+}
+
 // impl WRAM {
 //   fn write(address: )
 // }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct Mapper {
     pub cartridge: Option<Cartridge>,
+    pub wram: WRAM,
 }
 
 impl Mapper {
     pub fn read(&self, address: Address) -> u8 {
         println!("Mapper Read: {:x}:{:x}", address.bank, address.address);
         match address.address {
+            0x0000..=0x1FFF => {
+                // println!("WRAM READ")
+                return self.wram.lowRam[address.address as usize];
+            }
             0x2100..=0x21ff => {
                 println!("=> Access to PPU1, APU, HW-Registers");
                 // match address => {
@@ -38,7 +52,7 @@ impl Mapper {
                 }
             }
             _ => {}
-        }
+        };
         return 0;
     }
     // TODO: Implement rom type agnostic writes
@@ -48,6 +62,10 @@ impl Mapper {
             data, address.bank, address.address
         );
         match address.address {
+            0x0000..=0x1fff => {
+                // println!("WRAM write");
+                self.wram.lowRam[address.address as usize] = data;
+            }
             0x2100 => {
                 print!("INIDISP - Screen Display: ");
                 let force_blank = (data >> 7) != 0;
