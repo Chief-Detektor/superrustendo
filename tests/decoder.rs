@@ -75,7 +75,7 @@ mod tests {
     }
     #[test]
     fn adc_12() {
-        opcode_test!(0x71, Opcodes::ADC, AddressModes::DirectPageIndexedIndirectY);
+        opcode_test!(0x71, Opcodes::ADC, AddressModes::DirectPageIndirectIndexedY);
     }
     #[test]
     fn adc_13() {
@@ -144,7 +144,7 @@ mod tests {
     }
     #[test]
     fn and_12() {
-        opcode_test!(0x31, Opcodes::AND, AddressModes::DirectPageIndexedIndirectY);
+        opcode_test!(0x31, Opcodes::AND, AddressModes::DirectPageIndirectIndexedY);
     }
     #[test]
     fn and_13() {
@@ -213,7 +213,7 @@ mod tests {
     }
     #[test]
     fn cmp_12() {
-        opcode_test!(0xd1, Opcodes::CMP, AddressModes::DirectPageIndexedIndirectY);
+        opcode_test!(0xd1, Opcodes::CMP, AddressModes::DirectPageIndirectIndexedY);
     }
     #[test]
     fn cmp_13() {
@@ -282,7 +282,7 @@ mod tests {
     }
     #[test]
     fn eor_12() {
-        opcode_test!(0x51, Opcodes::EOR, AddressModes::DirectPageIndexedIndirectY);
+        opcode_test!(0x51, Opcodes::EOR, AddressModes::DirectPageIndirectIndexedY);
     }
     #[test]
     fn eor_13() {
@@ -351,7 +351,7 @@ mod tests {
     }
     #[test]
     fn lda_12() {
-        opcode_test!(0xb1, Opcodes::LDA, AddressModes::DirectPageIndexedIndirectY);
+        opcode_test!(0xb1, Opcodes::LDA, AddressModes::DirectPageIndirectIndexedY);
     }
     #[test]
     fn lda_13() {
@@ -420,7 +420,7 @@ mod tests {
     }
     #[test]
     fn ora_12() {
-        opcode_test!(0x11, Opcodes::ORA, AddressModes::DirectPageIndexedIndirectY);
+        opcode_test!(0x11, Opcodes::ORA, AddressModes::DirectPageIndirectIndexedY);
     }
     #[test]
     fn ora_13() {
@@ -489,7 +489,7 @@ mod tests {
     }
     #[test]
     fn sbc_12() {
-        opcode_test!(0xf1, Opcodes::SBC, AddressModes::DirectPageIndexedIndirectY);
+        opcode_test!(0xf1, Opcodes::SBC, AddressModes::DirectPageIndirectIndexedY);
     }
     #[test]
     fn sbc_13() {
@@ -560,7 +560,7 @@ mod tests {
     }
     #[test]
     fn sta_12() {
-        opcode_test!(0x91, Opcodes::STA, AddressModes::DirectPageIndexedIndirectY);
+        opcode_test!(0x91, Opcodes::STA, AddressModes::DirectPageIndirectIndexedY);
     }
     #[test]
     fn sta_13() {

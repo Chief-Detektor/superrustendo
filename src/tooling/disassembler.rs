@@ -301,7 +301,7 @@ fn get_operant_string(
             ret.push_str(&format!("({}, X)", number));
             ret
         }
-        AddressModes::DirectPageIndexedIndirectY => {
+        AddressModes::DirectPageIndirectIndexedY => {
             let constant: u8 = payload[0];
             let mut ret = String::from("$");
             let mut number = format!("{:x}", constant).to_string();

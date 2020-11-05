@@ -93,7 +93,7 @@ impl fmt::Debug for SnesHeader {
 
         let string = raw_string::RawStr::from_bytes(&self.title)
             .to_str()
-            .unwrap();
+            .unwrap_or("");
         write!(
             f,
             r#"SnesHeader {{

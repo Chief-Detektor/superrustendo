@@ -11,7 +11,7 @@ pub struct WRAM {
 impl WRAM {
     pub fn new() -> Self {
         WRAM {
-            lowRam: [0; 0x2000],
+            lowRam: [0xf; 0x2000],
             highRam: [0; 0x6000],
         }
     }

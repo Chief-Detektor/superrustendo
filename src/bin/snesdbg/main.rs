@@ -13,11 +13,11 @@ use std::env;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 use std::string::String;
-use superrustendo::{cartridge::Cartridge, mem::WRAM};
 use superrustendo::cpu::decoder::Decoder;
 use superrustendo::cpu::instructions::Instruction;
 use superrustendo::cpu::*;
 use superrustendo::mem::Mapper;
+use superrustendo::{cartridge::Cartridge, mem::WRAM};
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -36,7 +36,7 @@ fn main() -> Result<()> {
     // This translates addresses to components or correct memory locations
     let mut mapper = Mapper {
         cartridge: Some(card),
-        wram: WRAM::new()
+        wram: WRAM::new(),
     };
 
     // pretty self explainatory
