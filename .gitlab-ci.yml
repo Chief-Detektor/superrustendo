@@ -29,25 +29,33 @@
 # before_script:
 # - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
 
+services:
+  - docker:dind
+
 stages:
-  - setup
+  # - setup
   - test
   - build
   - deploy
 
-prepare:
-  stage: setup
-  image: $CI_REGISTRY_IMAGE
-  tags:
-    - docker
-  cache:
-    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
-    paths:
-      - target/debug/deps
-      - target/release/deps
-  script:
-    - rustup update
-    # - cargo build +nightly
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+
+# prepare:
+#   stage: setup
+#   image: $CI_REGISTRY_IMAGE
+#   tags:
+#     - docker
+#   cache:
+#     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+#     paths:
+#       - target/debug/deps
+#       - target/release/deps
+#   script:
+#     - rustup default nightly
+#     - rustup update
+#     # - cargo build +nightly
 
 test:cargo:
   stage: test
@@ -55,6 +63,7 @@ test:cargo:
   tags:
     - docker
   script:
+    # - rustup default nightly
     - rustc --version && cargo --version # Print version info for debugging
     - export CARGO_INCREMENTAL=0
     - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
@@ -98,13 +107,13 @@ coverage:cargo:
   tags:
     - docker
   script:
-    - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
+    # - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
     - export CARGO_INCREMENTAL=0
     - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
     - cargo test --verbose $CARGO_OPTIONS
     - |
       zip -0 ccov.zip `find . \( -name "superrustendo*.gc*" \) -print`;
-      ./grcov ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info;
+      grcov ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info;
     - genhtml lcov.info -o target/cov
   cache:
     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
@@ -123,11 +132,21 @@ doc:cargo:
   tags:
     - docker
   script:
-    - cargo
+    - cargo doc --no-deps
   cache:
     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
     paths:
       - target/doc
+
+docker:
+  tags:
+    - docker
+  image: docker
+  stage: deploy
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $CI_REGISTRY_IMAGE .
+    - docker push $CI_REGISTRY_IMAGE
 
 pages:
   tags:
