@@ -3,7 +3,7 @@ use crate::cpu::decoder::Opcodes;
 use crate::cpu::CPU;
 // use crate::cpu::
 use crate::cpu::{Accumulator, IndexRegister, Registers, StatusRegister};
-use crate::mem::Mapper;
+use crate::mem::Bus;
 
 use std::convert::TryInto;
 
@@ -25,11 +25,11 @@ impl Instruction {
         inst
     }
     // pub fn new(opcode: u8) -> Instruction {}
-    pub fn execute(&mut self, mut cpu: &mut CPU, mapper: &mut Mapper, follow_jumps: bool) {
+    pub fn execute(&mut self, mut cpu: &mut CPU, bus: &mut Bus, follow_jumps: bool) {
         // Get the correct address for instruction
         let effective_address =
             self.address_mode
-                .get_effective_address(&mut cpu, &self.payload, &self.opcode, &mapper);
+                .get_effective_address(&mut cpu, &self.payload, &self.opcode, &bus);
 
         if effective_address.is_some() {
             println!("Calculated effective address: {:?}", effective_address);
@@ -38,11 +38,11 @@ impl Instruction {
         match &self.opcode {
             Opcodes::AND => {
                 if cpu.e || cpu.regs.P.m == 1 {
-                    let val = mapper.read(effective_address.unwrap());
+                    let val = bus.read(effective_address.unwrap());
                     cpu.regs.C = Accumulator::from(cpu.regs.C.A & val as u16);
                 } else {
-                    let low = mapper.read(effective_address.unwrap());
-                    let high = mapper.read(effective_address.unwrap().add(1));
+                    let low = bus.read(effective_address.unwrap());
+                    let high = bus.read(effective_address.unwrap().add(1));
                     cpu.regs.C = Accumulator::from(
                         u16::from(cpu.regs.C) & (low as u16 | (high as u16) << 8),
                     );
@@ -63,12 +63,12 @@ impl Instruction {
                 // TODO: Decimal flag
                 if cpu.e || cpu.regs.P.m == 1 {
                     // 8-Bit
-                    if cpu.regs.C.A as u16 + (mapper.read(effective_address.unwrap()) as u16) > 255
+                    if cpu.regs.C.A as u16 + (bus.read(effective_address.unwrap()) as u16) > 255
                     {
                         cpu.regs.P.v = 1;
                     }
                     let mut data =
-                        (cpu.regs.C.A as u8).wrapping_add(mapper.read(effective_address.unwrap()));
+                        (cpu.regs.C.A as u8).wrapping_add(bus.read(effective_address.unwrap()));
                     if cpu.regs.P.c == 0 {
                         data += 1;
                     }
@@ -84,8 +84,8 @@ impl Instruction {
                     }
                     cpu.regs.C.A = data as u16;
                 } else {
-                    let mut data_low = mapper.read(effective_address.unwrap());
-                    let mut data_high = mapper.read(effective_address.unwrap().add(1));
+                    let mut data_low = bus.read(effective_address.unwrap());
+                    let mut data_high = bus.read(effective_address.unwrap().add(1));
                     if cpu.regs.C.A as u16 + (data_low as u16) > 255 {
                         // borrow required
                         data_high += 1;
@@ -130,7 +130,7 @@ impl Instruction {
                         val = cpu.regs.C.A as u8;
                     } else {
                         // shift val located at effective_address
-                        val = mapper.read(effective_address.unwrap());
+                        val = bus.read(effective_address.unwrap());
                     }
                     val = val << 1;
                     let msb = val >> 7;
@@ -143,7 +143,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Accumulator {
                         cpu.regs.C.A = val as u16
                     } else {
-                        mapper.write(effective_address.unwrap(), val);
+                        bus.write(effective_address.unwrap(), val);
                     }
                 } else {
                     let mut val;
@@ -151,8 +151,8 @@ impl Instruction {
                         val = u16::from(cpu.regs.C);
                     } else {
                         // shift val located at effective_address
-                        val = mapper.read(effective_address.unwrap()) as u16
-                            | ((mapper.read(effective_address.unwrap().add(1)) as u16) << 8)
+                        val = bus.read(effective_address.unwrap()) as u16
+                            | ((bus.read(effective_address.unwrap().add(1)) as u16) << 8)
                     }
                     val = val << 1;
                     let msb = val >> 15;
@@ -165,8 +165,8 @@ impl Instruction {
                     if self.address_mode == AddressModes::Accumulator {
                         cpu.regs.C = Accumulator::from(val);
                     } else {
-                        mapper.write(effective_address.unwrap(), (val & 0x0f) as u8);
-                        mapper.write(effective_address.unwrap().add(1), (val >> 8) as u8);
+                        bus.write(effective_address.unwrap(), (val & 0x0f) as u8);
+                        bus.write(effective_address.unwrap().add(1), (val >> 8) as u8);
                     }
                 }
             }
@@ -179,7 +179,7 @@ impl Instruction {
                             cpu.regs.P.z = 0;
                         }
                     } else {
-                        let mut val = mapper.read(effective_address.unwrap());
+                        let mut val = bus.read(effective_address.unwrap());
                         cpu.regs.P.n = (val >> 7) & 0x1;
                         cpu.regs.P.v = (val >> 6) & 0x1;
                         val = val & (cpu.regs.C.A as u8);
@@ -193,8 +193,8 @@ impl Instruction {
                             cpu.regs.P.z = 0;
                         }
                     } else {
-                        let mut val = mapper.read(effective_address.unwrap()) as u16
-                            | (mapper.read(effective_address.unwrap().add(1)) as u16) << 8;
+                        let mut val = bus.read(effective_address.unwrap()) as u16
+                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
                         cpu.regs.P.n = ((val >> 15) & 0x1) as u8;
                         cpu.regs.P.v = ((val >> 14) & 0x1) as u8;
                         val = val & u16::from(cpu.regs.C);
@@ -258,11 +258,11 @@ impl Instruction {
             Opcodes::CMP => {
                 let val;
                 if cpu.e || cpu.regs.P.m == 1 {
-                    val = u16::from(cpu.regs.C) - mapper.read(effective_address.unwrap()) as u16;
+                    val = u16::from(cpu.regs.C) - bus.read(effective_address.unwrap()) as u16;
                 } else {
                     val = u16::from(cpu.regs.C)
-                        - (mapper.read(effective_address.unwrap()) as u16
-                            | (mapper.read(effective_address.unwrap().add(1)) as u16) << 8);
+                        - (bus.read(effective_address.unwrap()) as u16
+                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8);
                 }
                 let res = u16::from(cpu.regs.C) - val;
 
@@ -293,7 +293,7 @@ impl Instruction {
                 if cpu.e || cpu.regs.P.x == 1 {
                     let val;
                     if self.address_mode != AddressModes::Immediate {
-                        val = mapper.read(effective_address.unwrap());
+                        val = bus.read(effective_address.unwrap());
                     } else {
                         val = self.payload[0];
                     }
@@ -317,8 +317,8 @@ impl Instruction {
                 } else {
                     let val;
                     if self.address_mode != AddressModes::Immediate {
-                        val = mapper.read(effective_address.unwrap()) as u16
-                            | (mapper.read(effective_address.unwrap().add(1)) as u16) << 8;
+                        val = bus.read(effective_address.unwrap()) as u16
+                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
                     } else {
                         val = self.payload[0] as u16 | ((self.payload[1] as u16) << 8);
                     }
@@ -370,12 +370,12 @@ impl Instruction {
             }
             Opcodes::EOR => {
                 if cpu.e || cpu.regs.P.m == 1 {
-                    let val = mapper.read(effective_address.unwrap());
+                    let val = bus.read(effective_address.unwrap());
                     cpu.regs.C =
                         Accumulator::from(cpu.regs.C.B | (cpu.regs.C.A as u8 ^ val) as u16);
                 } else {
-                    let val = mapper.read(effective_address.unwrap()) as u16
-                        | (mapper.read(effective_address.unwrap().add(1)) as u16) << 8;
+                    let val = bus.read(effective_address.unwrap()) as u16
+                        | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
                     cpu.regs.C = Accumulator::from(u16::from(cpu.regs.C) ^ val);
                 }
             }
@@ -411,7 +411,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Immediate {
                         val = effective_address.unwrap().address;
                     } else {
-                        val = mapper
+                        val = bus
                             .cartridge
                             .as_ref()
                             .unwrap()
@@ -439,7 +439,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Immediate {
                         val = load_address;
                     } else {
-                        val = mapper
+                        val = bus
                             .cartridge
                             .as_ref()
                             .unwrap()
@@ -466,7 +466,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Immediate {
                         val = effective_address.unwrap().address;
                     } else {
-                        val = mapper
+                        val = bus
                             .cartridge
                             .as_ref()
                             .unwrap()
@@ -494,7 +494,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Immediate {
                         val = load_address;
                     } else {
-                        val = mapper
+                        val = bus
                             .cartridge
                             .as_ref()
                             .unwrap()
@@ -621,7 +621,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Accumulator {
                         val = cpu.regs.C.A as u8
                     } else {
-                        val = mapper.read(effective_address.unwrap());
+                        val = bus.read(effective_address.unwrap());
                     }
                     let new_c = val >> 7;
                     let old_c = cpu.regs.P.c;
@@ -630,15 +630,15 @@ impl Instruction {
                     if self.address_mode == AddressModes::Accumulator {
                         cpu.regs.C.A = val as u16;
                     } else {
-                        mapper.write(effective_address.unwrap(), val);
+                        bus.write(effective_address.unwrap(), val);
                     }
                 } else {
                     let mut val;
                     if self.address_mode == AddressModes::Accumulator {
                         val = u16::from(cpu.regs.C);
                     } else {
-                        val = mapper.read(effective_address.unwrap()) as u16
-                            | (mapper.read(effective_address.unwrap().add(1)) as u16) << 8;
+                        val = bus.read(effective_address.unwrap()) as u16
+                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
                     }
                     let new_c = val >> 15;
                     let old_c = cpu.regs.P.c as u16;
@@ -647,8 +647,8 @@ impl Instruction {
                     if self.address_mode == AddressModes::Accumulator {
                         cpu.regs.C = Accumulator::from(val);
                     } else {
-                        mapper.write(effective_address.unwrap(), (val & 0xf) as u8);
-                        mapper.write(effective_address.unwrap().add(1), (val >> 8) as u8);
+                        bus.write(effective_address.unwrap(), (val & 0xf) as u8);
+                        bus.write(effective_address.unwrap().add(1), (val >> 8) as u8);
                     }
                 }
             }
@@ -670,7 +670,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Immediate {
                         val = self.payload[0] as u16;
                     } else {
-                        val = mapper.read(effective_address.unwrap()) as u16;
+                        val = bus.read(effective_address.unwrap()) as u16;
                     }
                     cpu.regs.C.A = val;
                 } else {
@@ -678,8 +678,8 @@ impl Instruction {
                     if self.address_mode == AddressModes::Immediate {
                         val = (self.payload[1] as u16) << 8 | self.payload[0] as u16;
                     } else {
-                        val = mapper.read(effective_address.unwrap()) as u16
-                            | (mapper.read(effective_address.unwrap().add(1)) as u16) << 8;
+                        val = bus.read(effective_address.unwrap()) as u16
+                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
                     }
                     cpu.regs.C = Accumulator::from(val);
                 }
@@ -690,7 +690,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Accumulator {
                         val = u16::from(cpu.regs.C) as u8;
                     } else {
-                        val = mapper.read(effective_address.unwrap());
+                        val = bus.read(effective_address.unwrap());
                     }
                     // set carry bit
                     cpu.regs.P.c = val & 0x1;
@@ -705,8 +705,8 @@ impl Instruction {
                     if self.address_mode == AddressModes::Accumulator {
                         val = u16::from(cpu.regs.C);
                     } else {
-                        val = mapper.read(effective_address.unwrap()) as u16
-                            | (mapper.read(effective_address.unwrap().add(1)) as u16) << 8;
+                        val = bus.read(effective_address.unwrap()) as u16
+                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
                     }
                     // set carry bit
                     cpu.regs.P.c = val as u8 & 1;
@@ -724,11 +724,11 @@ impl Instruction {
                 // TODO: Decimal flag
                 if cpu.regs.P.m == 1 || cpu.e {
                     // 8-Bit
-                    if cpu.regs.C.A as i8 - (mapper.read(effective_address.unwrap()) as i8) < 0 {
+                    if cpu.regs.C.A as i8 - (bus.read(effective_address.unwrap()) as i8) < 0 {
                         cpu.regs.P.v = 1;
                     }
                     let mut data =
-                        (cpu.regs.C.A as u8).wrapping_sub(mapper.read(effective_address.unwrap()));
+                        (cpu.regs.C.A as u8).wrapping_sub(bus.read(effective_address.unwrap()));
                     if cpu.regs.P.c == 0 {
                         data = data.wrapping_sub(1);
                     }
@@ -744,8 +744,8 @@ impl Instruction {
                     }
                     cpu.regs.C.A = data as u16;
                 } else {
-                    let mut data_low = mapper.read(effective_address.unwrap());
-                    let mut data_high = mapper.read(effective_address.unwrap().add(1));
+                    let mut data_low = bus.read(effective_address.unwrap());
+                    let mut data_high = bus.read(effective_address.unwrap().add(1));
                     if cpu.regs.C.A as i8 - (data_low as i8) < 0 {
                         // borrow required
                         data_high -= 1;
@@ -788,30 +788,30 @@ impl Instruction {
                 if cpu.e || cpu.regs.P.m == 1
                 /*&& cpu.e*/
                 {
-                    mapper.write(effective_address.unwrap(), cpu.regs.C.A as u8);
+                    bus.write(effective_address.unwrap(), cpu.regs.C.A as u8);
                 } else {
-                    mapper.write(effective_address.unwrap(), cpu.regs.C.A as u8);
-                    mapper.write(effective_address.unwrap().add(1), cpu.regs.C.B as u8);
-                    // mapper.write_u16(effective_address, cpu.regs.C.try_into().unwrap());
+                    bus.write(effective_address.unwrap(), cpu.regs.C.A as u8);
+                    bus.write(effective_address.unwrap().add(1), cpu.regs.C.B as u8);
+                    // bus.write_u16(effective_address, cpu.regs.C.try_into().unwrap());
                 }
             }
             Opcodes::STZ => {
-                mapper.write(effective_address.unwrap(), 0x0);
+                bus.write(effective_address.unwrap(), 0x0);
             }
             Opcodes::STX => {
                 if cpu.e || cpu.regs.P.m == 1 {
-                    mapper.write(effective_address.unwrap(), cpu.regs.X.low as u8);
+                    bus.write(effective_address.unwrap(), cpu.regs.X.low as u8);
                 } else {
-                    mapper.write(effective_address.unwrap(), cpu.regs.X.low as u8);
-                    mapper.write(effective_address.unwrap().add(1), cpu.regs.X.high as u8);
+                    bus.write(effective_address.unwrap(), cpu.regs.X.low as u8);
+                    bus.write(effective_address.unwrap().add(1), cpu.regs.X.high as u8);
                 }
             }
             Opcodes::STY => {
                 if cpu.e || cpu.regs.P.m == 1 {
-                    mapper.write(effective_address.unwrap(), cpu.regs.Y.low as u8);
+                    bus.write(effective_address.unwrap(), cpu.regs.Y.low as u8);
                 } else {
-                    mapper.write(effective_address.unwrap(), cpu.regs.Y.low as u8);
-                    mapper.write(effective_address.unwrap().add(1), cpu.regs.Y.high as u8);
+                    bus.write(effective_address.unwrap(), cpu.regs.Y.low as u8);
+                    bus.write(effective_address.unwrap().add(1), cpu.regs.Y.high as u8);
                 }
             }
             Opcodes::TCS => {
@@ -902,7 +902,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Accumulator {
                         val = cpu.regs.C.A as u8;
                     } else {
-                        val = mapper.read(effective_address.unwrap()) as u8;
+                        val = bus.read(effective_address.unwrap()) as u8;
                     }
                     val = val.wrapping_sub(1);
                     if val >> 7 == 1 {
@@ -918,7 +918,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Accumulator {
                         cpu.regs.C.A = val as u16;
                     } else {
-                        mapper.write(effective_address.unwrap(), val);
+                        bus.write(effective_address.unwrap(), val);
                     }
                 } else {
                     // TODO
@@ -926,7 +926,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Accumulator {
                         val = cpu.regs.C.A as u8;
                     } else {
-                        val = mapper.read(effective_address.unwrap()) as u8;
+                        val = bus.read(effective_address.unwrap()) as u8;
                     }
                     val -= 1;
                     if val >> 7 == 1 {
@@ -942,7 +942,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Accumulator {
                         cpu.regs.C.A = val as u16;
                     } else {
-                        mapper.write(effective_address.unwrap(), val);
+                        bus.write(effective_address.unwrap(), val);
                     }
                 }
             }
@@ -978,8 +978,8 @@ impl Instruction {
                         }
                     } else {
                         // TODO: Wrapping?
-                        let val = mapper.read(effective_address.unwrap()) + 1;
-                        mapper.write(effective_address.unwrap(), val);
+                        let val = bus.read(effective_address.unwrap()) + 1;
+                        bus.write(effective_address.unwrap(), val);
                         if val == 0 {
                             cpu.regs.P.z = 1;
                         } else {
@@ -1006,10 +1006,10 @@ impl Instruction {
                         }
                     } else {
                         // TODO: Wrapping?
-                        let val_low = mapper.read(effective_address.unwrap());
-                        let val_high = mapper.read(effective_address.unwrap().add(1));
-                        mapper.write(effective_address.unwrap(), val_low);
-                        mapper.write(effective_address.unwrap().add(1), val_high);
+                        let val_low = bus.read(effective_address.unwrap());
+                        let val_high = bus.read(effective_address.unwrap().add(1));
+                        bus.write(effective_address.unwrap(), val_low);
+                        bus.write(effective_address.unwrap().add(1), val_high);
 
                         if val_low as u16 | (val_high as u16) << 8 == 0 {
                             cpu.regs.P.z = 1;
@@ -1156,12 +1156,12 @@ impl Instruction {
                         bank: src_bnk,
                         address: source,
                     };
-                    let val = mapper.read(src_address);
+                    let val = bus.read(src_address);
                     let dest_address = Address {
                         bank: dest_bnk,
                         address: dest,
                     };
-                    mapper.write(dest_address, val);
+                    bus.write(dest_address, val);
 
                     // print!("{:x} : {:?}|", val, address);
                     cpu.regs.X = IndexRegister::from(u16::from(cpu.regs.X).wrapping_add(1));
@@ -1182,7 +1182,7 @@ impl Instruction {
                     if self.address_mode == AddressModes::Immediate {
                         val = self.payload[0];
                     } else {
-                        val = mapper.read(effective_address.unwrap());
+                        val = bus.read(effective_address.unwrap());
                     }
                     cpu.regs.C.A = cpu.regs.C.A | val as u16;
                     if u16::from(cpu.regs.C.A) as u8 >> 7 == 1 {
@@ -1201,8 +1201,8 @@ impl Instruction {
                     if self.address_mode == AddressModes::Immediate {
                         val = self.payload[0] as u16 | (self.payload[1] as u16) << 8;
                     } else {
-                        val = mapper.read(effective_address.unwrap()) as u16
-                            | (mapper.read(effective_address.unwrap().add(1)) as u16) << 8;
+                        val = bus.read(effective_address.unwrap()) as u16
+                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
                     }
                     cpu.regs.C = Accumulator::from(u16::from(cpu.regs.C) | val as u16);
                     if u16::from(cpu.regs.C) >> 15 == 1 {

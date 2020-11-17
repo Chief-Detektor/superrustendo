@@ -3,7 +3,7 @@ use super::constants::*;
 use super::decoder::Opcodes;
 use super::Registers;
 use super::CPU;
-use crate::mem::Mapper;
+use crate::mem::Bus;
 use std::convert::TryInto;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -105,7 +105,7 @@ impl AddressModes {
         cpu: &mut CPU,
         payload: &Vec<u8>,
         opcode: &Opcodes,
-        mapper: &Mapper,
+        bus: &Bus,
     ) -> Option<Address> {
         let mut address = Address {
             bank: 0,
@@ -219,8 +219,8 @@ impl AddressModes {
                     indirect_address += x;
                 }
 
-                let addresss_low = mapper.read(address);
-                let addresss_high = mapper.read(address.add(1));
+                let addresss_low = bus.read(address);
+                let addresss_high = bus.read(address.add(1));
 
                 // cpu.regs.PC = (cpu.regs.PBR as u32) << 16 | (addresss_high as u32) << 8 | addresss_low as u32;
                 address.address = (addresss_high as u16) << 8 | addresss_low as u16;
@@ -274,11 +274,11 @@ impl AddressModes {
             }
             AddressModes::StackRelativeIndirectIndexedY => {
                 let val = payload[0] as u16 + u16::from(cpu.regs.S);
-                let mut addr = mapper.read(Address {
+                let mut addr = bus.read(Address {
                     address: val,
                     bank: 0,
                 }) as u16
-                    | (mapper.read(
+                    | (bus.read(
                         Address {
                             address: val,
                             bank: 0,
@@ -308,16 +308,16 @@ impl AddressModes {
                 // TODO: Eval this
                 let interrupt_vector;
                 if !cpu.e {
-                    interrupt_vector = mapper.cartridge.as_ref().unwrap().header.native_irq;
+                    interrupt_vector = bus.cartridge.as_ref().unwrap().header.native_irq;
                 } else {
-                    interrupt_vector = mapper.cartridge.as_ref().unwrap().header.emu_irq;
+                    interrupt_vector = bus.cartridge.as_ref().unwrap().header.emu_irq;
                 }
                 let load_address = Address {
                     bank: 0,
                     address: interrupt_vector,
                 };
-                let val_low = mapper.read(load_address);
-                let val_high = mapper.read(load_address.add(1));
+                let val_low = bus.read(load_address);
+                let val_high = bus.read(load_address.add(1));
 
                 address.address = (val_high as u16) << 8 | val_low as u16;
                 return Some(address);
@@ -335,11 +335,11 @@ impl AddressModes {
             }
             AddressModes::DirectPageIndirect => {
                 let val = payload[0] as u16 + cpu.regs.D;
-                let addr_low = mapper.read(Address {
+                let addr_low = bus.read(Address {
                     bank: 0,
                     address: val,
                 });
-                let addr_high = mapper.read(
+                let addr_high = bus.read(
                     Address {
                         bank: 0,
                         address: val,
@@ -353,18 +353,18 @@ impl AddressModes {
             }
             AddressModes::DirectPageIndirectLong => {
                 let val = payload[0] as u16 + cpu.regs.D;
-                let addr_low = mapper.read(Address {
+                let addr_low = bus.read(Address {
                     bank: 0,
                     address: val,
                 });
-                let addr_high = mapper.read(
+                let addr_high = bus.read(
                     Address {
                         bank: 0,
                         address: val,
                     }
                     .add(1),
                 );
-                let bank = mapper.read(
+                let bank = bus.read(
                     Address {
                         bank: 0,
                         address: val,
@@ -379,11 +379,11 @@ impl AddressModes {
                 if cpu.e || cpu.regs.P.x == 1 {
                     let mut val;
                     val = cpu.regs.D + payload[0] as u16;
-                    address.address = (mapper.read(Address {
+                    address.address = (bus.read(Address {
                         bank: 0,
                         address: val,
                     }) as u16
-                        | (mapper.read(
+                        | (bus.read(
                             Address {
                                 bank: 0,
                                 address: val,
@@ -396,11 +396,11 @@ impl AddressModes {
                 } else {
                     let mut val;
                     val = cpu.regs.D + payload[0] as u16;
-                    address.address = (mapper.read(Address {
+                    address.address = (bus.read(Address {
                         bank: 0,
                         address: val,
                     }) as u16
-                        | (mapper.read(
+                        | (bus.read(
                             Address {
                                 bank: 0,
                                 address: val,
@@ -415,15 +415,15 @@ impl AddressModes {
             }
             AddressModes::DirectPageIndirectLongIndexedY => {
                 let indirect = cpu.regs.D + payload[0] as u16;
-                let addr_low = mapper.read(Address {
+                let addr_low = bus.read(Address {
                     address: indirect,
                     bank: 0,
                 });
-                let addr_high = mapper.read(Address {
+                let addr_high = bus.read(Address {
                     address: indirect,
                     bank: 0,
                 });
-                let addr_bank = mapper.read(Address {
+                let addr_bank = bus.read(Address {
                     address: indirect,
                     bank: 0,
                 });
@@ -463,11 +463,11 @@ impl AddressModes {
                     val += val
                         .wrapping_add(cpu.regs.X.low as u8)
                         .wrapping_add(payload[0]);
-                    let indirect = mapper.read(Address {
+                    let indirect = bus.read(Address {
                         bank: 0,
                         address: val as u16,
                     }) as u16
-                        | (mapper.read(
+                        | (bus.read(
                             Address {
                                 bank: 0,
                                 address: val as u16,
@@ -480,11 +480,11 @@ impl AddressModes {
                     let mut val;
                     val = cpu.regs.D;
                     val += u16::from(cpu.regs.X) + payload[0] as u16;
-                    address.address = mapper.read(Address {
+                    address.address = bus.read(Address {
                         bank: 0,
                         address: val,
                     }) as u16
-                        | (mapper.read(
+                        | (bus.read(
                             Address {
                                 bank: 0,
                                 address: val,
