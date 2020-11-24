@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 use std::collections::HashMap;
 use std::env;
 use std::io::{Error, ErrorKind};

@@ -5,6 +5,7 @@
 
 // Non stable features
 #![feature(or_patterns)]
+#![recursion_limit = "256"]
 
 use rustyline;
 use rustyline::error::ReadlineError;

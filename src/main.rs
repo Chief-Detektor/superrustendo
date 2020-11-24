@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 use crate::mem::WRAM;
 use std::collections::HashMap;
 use std::env;

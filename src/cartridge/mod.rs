@@ -144,10 +144,10 @@ impl Cartridge {
     pub fn get_emu_reset_vector(&self) -> u16 {
         self.header.emu_res
     }
-    pub fn load_rom(path: &Path) -> Result<Cartridge, &'static str> {
-        let mut file = File::open(path).unwrap();
+    pub fn load_rom(path: &Path) -> Result<Cartridge, Box<dyn Error>> {
+        let mut file = File::open(path)?;
         let mut rom = Vec::new();
-        let size = file.read_to_end(&mut rom).unwrap();
+        let size = file.read_to_end(&mut rom)?;
 
         let hi_rom = 0xffc0;
         let low_rom = 0x7fc0;
@@ -173,7 +173,7 @@ impl Cartridge {
             return Ok(card);
         } else {
             println!(r#"No header found"#);
-            return Err("Invalid rom");
+            return Err("No haeder found".into());
         }
     }
 
