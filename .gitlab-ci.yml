@@ -57,16 +57,17 @@ coverage:cargo:
     paths:
       - target/cov
 
-doc:cargo:
-  stage: build
-  image: $CI_REGISTRY_IMAGE
-  tags:
-    - docker
-  script:
-    - cargo doc --no-deps
-  artifacts:
-    paths:
-      - target/doc
+# doc:cargo:
+#   stage: build
+#   image: $CI_REGISTRY_IMAGE
+#   tags:
+#     - docker
+#   script:
+#     - cargo doc --no-deps
+#   cache:
+#     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+#     paths:
+#       - target/doc
 
 build:cargo:
   stage: build
@@ -82,17 +83,17 @@ build:cargo:
     untracked: false
     expire_in: 30 days
 
-docker:
-  tags:
-    - docker
-  image: docker
-  stage: deploy
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $CI_REGISTRY_IMAGE .
-    - docker push $CI_REGISTRY_IMAGE
-  only:
-    - master
+# docker:
+#   tags:
+#     - docker
+#   image: docker
+#   stage: deploy
+#   script:
+#     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#     - docker build -t $CI_REGISTRY_IMAGE .
+#     - docker push $CI_REGISTRY_IMAGE
+# only:
+# - master
 # TODO: Build release image containing only alpine and build binaries
 
 pages:
@@ -102,7 +103,7 @@ pages:
   image: $CI_REGISTRY_IMAGE
   dependencies:
     - coverage:cargo
-    - doc:cargo
+    # - doc:cargo
   script:
     - mkdir public
     - mv target/cov public/cov
@@ -112,5 +113,5 @@ pages:
     paths:
       - public
     expire_in: 30 days
-  only:
-    - master
+  # only:
+  #   - master
