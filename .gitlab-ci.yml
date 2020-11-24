@@ -107,14 +107,10 @@ coverage:cargo:
   tags:
     - docker
   script:
-    # - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
-    - export CARGO_INCREMENTAL=0
-    - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
-    - cargo test --verbose $CARGO_OPTIONS
-    - |
-      zip -0 ccov.zip `find . \( -name "superrustendo*.gc*" \) -print`;
-      grcov ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info;
-    - genhtml lcov.info -o target/cov
+    - export RUSTFLAGS="-Zinstrument-coverage"
+    - cargo build
+    - grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./target/debug/lcov.info
+    - genhtml -o ./target/cov/ --show-details --highlight --ignore-errors source --legend ./target/debug/lcov.info
   cache:
     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
     paths:
@@ -126,17 +122,31 @@ coverage:cargo:
       - target/cov
   #   expire_in: 30 days
 
-doc:cargo:
+# doc:cargo:
+#   stage: build
+#   image: $CI_REGISTRY_IMAGE
+#   tags:
+#     - docker
+#   script:
+#     - cargo doc --no-deps
+#   cache:
+#     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+#     paths:
+#       - target/doc
+
+build:cargo:
   stage: build
   image: $CI_REGISTRY_IMAGE
   tags:
     - docker
   script:
-    - cargo doc --no-deps
-  cache:
-    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+    - cargo build --release
+    - strip target/release/{superrustendo,snesdbg,snesdis}
+  artifacts:
     paths:
-      - target/doc
+      - target/release/{superrustendo,snesdbg,snesdis}
+    untracked: false
+    expire_in: 30 days
 
 docker:
   tags:
@@ -147,8 +157,8 @@ docker:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker build -t $CI_REGISTRY_IMAGE .
     - docker push $CI_REGISTRY_IMAGE
-  only:
-    - master
+  # only:
+  # - master
 # TODO: Build release image containing only alpine and build binaries
 
 pages:
@@ -158,7 +168,7 @@ pages:
   image: $CI_REGISTRY_IMAGE
   dependencies:
     - coverage:cargo
-    - doc:cargo
+    # - doc:cargo
   script:
     # - find target/cov -xtype l -delete
     - mv target/cov public/cov
