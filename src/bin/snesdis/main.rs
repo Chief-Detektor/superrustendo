@@ -1,13 +1,14 @@
+#![recursion_limit = "256"]
 use std::collections::HashMap;
 use std::env;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 
-use superrustendo::{cartridge::Cartridge, mem::WRAM};
 use superrustendo::cpu::decoder::*;
 use superrustendo::cpu::*;
-use superrustendo::mem::Mapper;
+use superrustendo::mem::Bus;
 use superrustendo::tooling::disassembler::PrintToken;
+use superrustendo::{cartridge::Cartridge, mem::WRAM};
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -25,12 +26,12 @@ fn main() -> std::io::Result<()> {
     let mut cpu = CPU::new();
 
     // TODO: Fix address offsets => rom mapping starts at 0x8000.. for bank 00
-    let mut mapper = Mapper {
+    let mut bus = Bus {
         cartridge: Some(card),
-        wram: WRAM::new()
+        wram: WRAM::new(),
     };
 
-    let decoder = Decoder::new(&mut cpu, &mut mapper, true);
+    let decoder = Decoder::new(&mut cpu, &mut bus, true);
 
     let mut labels = HashMap::new();
     let mut decoded_asm = Vec::new();

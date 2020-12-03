@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 use crate::mem::WRAM;
 use std::collections::HashMap;
 use std::env;
@@ -12,7 +13,7 @@ pub mod tooling;
 
 use crate::cpu::decoder::*;
 use crate::cpu::*;
-use crate::mem::Mapper;
+use crate::mem::Bus;
 use crate::tooling::disassembler::PrintToken;
 
 fn main() -> std::io::Result<()> {
@@ -32,12 +33,12 @@ fn main() -> std::io::Result<()> {
 
     // TODO: Fix address offsets => rom mapping starts at 0x8000.. for bank 00
     // cpu.regs.PC = 0x4;
-    let mut mapper = Mapper {
+    let mut bus = Bus {
         cartridge: Some(card),
         wram: WRAM::new(),
     };
 
-    let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+    let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
 
     // let mut labels = HashMap::new();
     // let mut decoded_asm = Vec::new();

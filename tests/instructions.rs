@@ -8,19 +8,19 @@ mod tests {
     use superrustendo::cpu::{decoder::Opcodes, IndexRegister, StatusRegister};
     use superrustendo::{
         cpu::{addressmodes::AddressModes, decoder::Decoder, CPU},
-        mem::Mapper,
+        mem::Bus,
     };
 
     #[test]
     fn sei_instruction() {
         let mut cpu = CPU::new();
-        let mut mapper = Mapper { cartridge: None, wram: WRAM::new() };
-        // let mut mapper = Mapper { cartridge: None };
+        let mut bus = Bus { cartridge: None, wram: WRAM::new() };
+        // let mut bus = Bus { cartridge: None };
         let mut P = StatusRegister::default();
         P.set_i(0);
         cpu.get_regs().set_P(&P);
 
-        let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+        let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
 
         let mut i = Instruction {
             address: 0x0,
@@ -39,13 +39,13 @@ mod tests {
     #[test]
     fn clc_instruction() {
         let mut cpu = CPU::new();
-        let mut mapper = Mapper { cartridge: None, wram: WRAM::new() };
-        // let mut mapper = Mapper { cartridge: None };
+        let mut bus = Bus { cartridge: None, wram: WRAM::new() };
+        // let mut bus = Bus { cartridge: None };
         let mut P = StatusRegister::default();
         P.set_c(1);
         cpu.get_regs().set_P(&P);
 
-        let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+        let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
 
         let mut i = Instruction {
             address: 0x0,
@@ -64,14 +64,14 @@ mod tests {
     #[test]
     fn cld_instruction() {
         let mut cpu = CPU::new();
-        let mut mapper = Mapper { cartridge: None, wram: WRAM::new() };
-        // let mut mapper = Mapper { cartridge: None };
+        let mut bus = Bus { cartridge: None, wram: WRAM::new() };
+        // let mut bus = Bus { cartridge: None };
         let mut P = StatusRegister::default();
 
         P.set_d(1);
         cpu.get_regs().set_P(&P);
 
-        let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+        let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
 
         let mut i = Instruction {
             address: 0x0,
@@ -89,8 +89,8 @@ mod tests {
     #[test]
     fn xce_instruction() {
         let mut cpu = CPU::new();
-        let mut mapper = Mapper { cartridge: None, wram: WRAM::new() };
-        // let mut mapper = Mapper { cartridge: None };
+        let mut bus = Bus { cartridge: None, wram: WRAM::new() };
+        // let mut bus = Bus { cartridge: None };
         let mut P = StatusRegister::default();
 
         let mut i = Instruction {
@@ -108,7 +108,7 @@ mod tests {
             cpu.get_regs().set_P(&P);
             println!("{:?}", cpu);
 
-            let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+            let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
             decoder.execute_instruction(&mut i);
 
             println!("{:?}", cpu);
@@ -123,7 +123,7 @@ mod tests {
             P.set_c(1);
             cpu.get_regs().set_P(&P);
 
-            let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+            let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
             decoder.execute_instruction(&mut i);
 
             assert!(cpu.get_emulation_mode() == true);
@@ -135,8 +135,8 @@ mod tests {
     #[test]
     fn rep_instruction() {
         let mut cpu = CPU::new();
-        let mut mapper = Mapper { cartridge: None, wram: WRAM::new() };
-        // let mut mapper = Mapper { cartridge: None };
+        let mut bus = Bus { cartridge: None, wram: WRAM::new() };
+        // let mut bus = Bus { cartridge: None };
         let mut P = StatusRegister::from(0b11111111);
 
         cpu.get_regs().set_P(&P);
@@ -150,7 +150,7 @@ mod tests {
             cycles: 3,
         };
 
-        let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+        let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
         decoder.execute_instruction(&mut i);
 
         assert!(u8::from(*cpu.get_regs().get_P()) == 0);
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn txy_instruction() {
         let mut cpu = CPU::new();
-        let mut mapper = Mapper { cartridge: None, wram: WRAM::new() };
+        let mut bus = Bus { cartridge: None, wram: WRAM::new() };
         let mut P = StatusRegister::default();
 
         let mut X = IndexRegister::from(0xf7f7u16);
@@ -178,7 +178,7 @@ mod tests {
                 cycles: 2,
             };
 
-            let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+            let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
             decoder.execute_instruction(&mut i);
 
             // The low byte should be copied
@@ -206,7 +206,7 @@ mod tests {
                 cycles: 2,
             };
 
-            let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+            let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
             decoder.execute_instruction(&mut i);
 
             // The low byte should be copied
@@ -233,7 +233,7 @@ mod tests {
                 cycles: 2,
             };
 
-            let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+            let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
             decoder.execute_instruction(&mut i);
 
             // The low byte should be copied
@@ -259,7 +259,7 @@ mod tests {
                 cycles: 2,
             };
 
-            let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+            let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
             decoder.execute_instruction(&mut i);
 
             // The low byte should be copied
@@ -287,7 +287,7 @@ mod tests {
                 cycles: 2,
             };
 
-            let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+            let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
             decoder.execute_instruction(&mut i);
 
             // The low byte should be copied
@@ -317,7 +317,7 @@ mod tests {
                 cycles: 2,
             };
 
-            let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+            let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
             decoder.execute_instruction(&mut i);
 
             // The low byte should be copied
@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn txs_instruction() {
         let mut cpu = CPU::new();
-        let mut mapper = Mapper { cartridge: None, wram: WRAM::new() };
+        let mut bus = Bus { cartridge: None, wram: WRAM::new() };
 
         let mut X = IndexRegister::from(0xffu16);
         {
@@ -352,7 +352,7 @@ mod tests {
                 cycles: 2,
             };
 
-            let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+            let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
 
             decoder.execute_instruction(&mut i);
 
@@ -374,7 +374,7 @@ mod tests {
                 cycles: 2,
             };
 
-            let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+            let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
 
             decoder.execute_instruction(&mut i);
 
@@ -398,7 +398,7 @@ mod tests {
                 cycles: 2,
             };
 
-            let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+            let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
 
             decoder.execute_instruction(&mut i);
             // println!("{:?}", cpu.get_regs().get_S());

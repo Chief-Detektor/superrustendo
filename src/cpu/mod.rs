@@ -43,6 +43,36 @@ bitfields!(
    }
 );
 
+// impl From<StatusRegister> for u8 {
+//     fn from(val: StatusRegister) -> Self {
+//         let P =
+//              val.c & 0x1
+//             |(val.z >> 1) & 0x1
+//             |(val.i >> 2) & 0x1
+//             |(val.d >> 3) & 0x1
+//             |(val.x >> 4) & 0x1
+//             |(val.m >> 5) & 0x1
+//             |(val.v >> 6) & 0x1
+//             |(val.n >> 7) & 0x1;
+//         P
+//     }
+// }
+// impl From<u8> for StatusRegister {
+//     fn from(val: u8) -> Self {
+//         let P = StatusRegister{
+//             c: val & 0x1,
+//             z:(val >> 1) & 0x1,
+//             i:(val >> 2) & 0x1,
+//             d:(val >> 3) & 0x1,
+//             x:(val >> 4) & 0x1,
+//             m:(val >> 5) & 0x1,
+//             v:(val >> 6) & 0x1,
+//             n:(val >> 7) & 0x1
+//         };
+//         P
+//     }
+// }
+
 impl StatusRegister {
     pub fn get_c(&self) -> u8 {
         return self.c;

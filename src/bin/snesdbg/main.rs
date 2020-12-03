@@ -5,6 +5,7 @@
 
 // Non stable features
 #![feature(or_patterns)]
+#![recursion_limit = "256"]
 
 use rustyline;
 use rustyline::error::ReadlineError;
@@ -13,11 +14,11 @@ use std::env;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 use std::string::String;
-use superrustendo::{cartridge::Cartridge, mem::WRAM};
 use superrustendo::cpu::decoder::Decoder;
 use superrustendo::cpu::instructions::Instruction;
 use superrustendo::cpu::*;
-use superrustendo::mem::Mapper;
+use superrustendo::mem::Bus;
+use superrustendo::{cartridge::Cartridge, mem::WRAM};
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -34,16 +35,16 @@ fn main() -> Result<()> {
     println!("Loaded Cardidge: {:?}", card.header);
 
     // This translates addresses to components or correct memory locations
-    let mut mapper = Mapper {
+    let mut bus = Bus {
         cartridge: Some(card),
-        wram: WRAM::new()
+        wram: WRAM::new(),
     };
 
     // pretty self explainatory
     let mut cpu = CPU::new();
 
     // decoder is an iteratior that iterates over the program code
-    let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+    let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
 
     // the readline handle
     let mut rl = rustyline::Editor::<()>::new();

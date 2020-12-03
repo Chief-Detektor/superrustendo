@@ -5,7 +5,7 @@ use crate::cpu::addressmodes::{
 use crate::cpu::constants::*;
 use crate::cpu::instructions::Instruction;
 use crate::cpu::CPU;
-use crate::mem::Mapper;
+use crate::mem::Bus;
 use std::convert::TryInto;
 use std::num::Wrapping;
 
@@ -433,23 +433,23 @@ fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
 pub struct Decoder<'t> {
     instructions: Vec<Instruction>,
     pub cpu: &'t mut CPU,
-    mapper: &'t mut Mapper,
+    bus: &'t mut Bus,
     follow_jumps: bool,
 }
 
 impl<'t> Decoder<'t> {
-    pub fn new(cpu: &'t mut super::CPU, mapper: &'t mut Mapper, follow_jumps: bool) -> Decoder<'t> {
+    pub fn new(cpu: &'t mut super::CPU, bus: &'t mut Bus, follow_jumps: bool) -> Decoder<'t> {
         let mut decoder = Decoder {
             instructions: Vec::new(),
             cpu: cpu,
-            mapper: mapper,
+            bus: bus,
             follow_jumps: follow_jumps,
         };
 
-        match decoder.mapper.cartridge {
+        match decoder.bus.cartridge {
             Some(_) => {
                 decoder.cpu.regs.PC = decoder
-                    .mapper
+                    .bus
                     .cartridge
                     .as_ref()
                     .unwrap()
@@ -463,7 +463,7 @@ impl<'t> Decoder<'t> {
 
     pub fn execute_instruction(&mut self, instruction: &mut Instruction) {
         println!("Executing: {:?}", instruction);
-        instruction.execute(self.cpu, self.mapper, self.follow_jumps);
+        instruction.execute(self.cpu, self.bus, self.follow_jumps);
     }
 
     /// # Examples
@@ -472,12 +472,12 @@ impl<'t> Decoder<'t> {
     /// use superrustendo::cpu::addressmodes::AddressModes;
     ///
     /// use superrustendo::cpu::decoder::{ Decoder, Opcodes};
-    /// use superrustendo::mem::{Mapper, WRAM};
+    /// use superrustendo::mem::{Bus, WRAM};
     /// use superrustendo::cpu::{Accumulator, CPU, IndexRegister, Registers, StatusRegister};
     /// use std::convert::TryInto;
     ///
     /// let mut c = CPU::new();
-    /// let mut m = Mapper { cartridge: None, wram: WRAM::new()};
+    /// let mut m = Bus { cartridge: None, wram: WRAM::new()};
     /// let d = Decoder::new(&mut c, &mut m, /* follow_jumps */ false);
     /// let result = d.decode(0x3d);
     /// let res = result.unwrap();
@@ -514,10 +514,10 @@ impl Iterator for Decoder<'_> {
             address: self.cpu.regs.PC,
         };
         let inst = self
-            .decode(self.mapper.read(address).try_into().unwrap())
+            .decode(self.bus.read(address).try_into().unwrap())
             .unwrap();
 
-        let payload = self.mapper.cartridge.as_ref().unwrap().read_bytes(
+        let payload = self.bus.cartridge.as_ref().unwrap().read_bytes(
             (self.cpu.regs.PC as u32 + 1) as usize, // The payload starts 1 after opcode
             inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
         );
@@ -536,7 +536,7 @@ impl Iterator for Decoder<'_> {
         instr.address_mode = inst.1;
         instr.payload = payload;
 
-        instr.execute(&mut self.cpu, &mut self.mapper, self.follow_jumps);
+        instr.execute(&mut self.cpu, &mut self.bus, self.follow_jumps);
         Some(instr)
     }
 }

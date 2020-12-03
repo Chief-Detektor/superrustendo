@@ -11,7 +11,7 @@ pub struct WRAM {
 impl WRAM {
     pub fn new() -> Self {
         WRAM {
-            lowRam: [0; 0x2000],
+            lowRam: [0xf; 0x2000],
             highRam: [0; 0x6000],
         }
     }
@@ -22,14 +22,14 @@ impl WRAM {
 // }
 
 //#[derive(Debug)]
-pub struct Mapper {
+pub struct Bus {
     pub cartridge: Option<Cartridge>,
     pub wram: WRAM,
 }
 
-impl Mapper {
+impl Bus {
     pub fn read(&self, address: Address) -> u8 {
-        println!("Mapper Read: {:x}:{:x}", address.bank, address.address);
+        println!("Bus Read: {:x}:{:x}", address.bank, address.address);
         match address.address {
             0x0000..=0x1FFF => {
                 // println!("WRAM READ")
@@ -58,7 +58,7 @@ impl Mapper {
     // TODO: Implement rom type agnostic writes
     pub fn write(&mut self, address: Address, data: u8) {
         println!(
-            "Mapper Write: {:x} to {:x}:{:x}",
+            "Bus Write: {:x} to {:x}:{:x}",
             data, address.bank, address.address
         );
         match address.address {
