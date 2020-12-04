@@ -3,7 +3,7 @@ use super::constants::*;
 use super::decoder::Opcodes;
 use super::Registers;
 use super::CPU;
-use crate::mem::Mapper;
+use crate::mem::Bus;
 use std::convert::TryInto;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,7 +20,7 @@ pub enum AddressModes {
     BlockMove,
     DirectPage,
     DirectPageIndexedIndirectX,
-    DirectPageIndexedIndirectY,
+    DirectPageIndirectIndexedY,
     DirectPageIndexedX,
     DirectPageIndexedY,
     DirectPageIndirect,
@@ -60,7 +60,7 @@ impl AddressModes {
             AddressModes::BlockMove => 3,
             AddressModes::DirectPage => 2,
             AddressModes::DirectPageIndexedIndirectX => 2,
-            AddressModes::DirectPageIndexedIndirectY => 2,
+            AddressModes::DirectPageIndirectIndexedY => 2,
             AddressModes::DirectPageIndexedX => 2,
             AddressModes::DirectPageIndexedY => 2,
             AddressModes::DirectPageIndirect => 2,
@@ -73,8 +73,8 @@ impl AddressModes {
                             return 3;
                         }
                     }
-                    Opcodes::LDA => {
-                        if regs.P.m != 1 {
+                    Opcodes::LDA | Opcodes::BIT => {
+                        if regs.P.m == 0 {
                             return 3;
                         }
                     }
@@ -105,7 +105,7 @@ impl AddressModes {
         cpu: &mut CPU,
         payload: &Vec<u8>,
         opcode: &Opcodes,
-        mapper: &Mapper,
+        bus: &Bus,
     ) -> Option<Address> {
         let mut address = Address {
             bank: 0,
@@ -127,22 +127,105 @@ impl AddressModes {
 
                 return Some(address);
             }
-            // AddressModes::AbsoluteIndexedX => {
-            // unimplemented!();
-            // let data = payload.as_slice();
+            AddressModes::AbsoluteIndexedX => {
+                address.bank = cpu.regs.DBR;
+                if cpu.regs.P.x == 1 {
+                    if (payload[0] as u32 | (payload[1] as u32) << 8) + cpu.regs.X.low as u32
+                        > 0xffff
+                    {
+                        address.bank += 1;
+                        address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
+                            .wrapping_add(cpu.regs.X.low);
+                    } else {
+                        address.address =
+                            (payload[0] as u16 | (payload[1] as u16) << 8) + cpu.regs.X.low;
+                    }
+                } else {
+                    if (payload[0] as u32 | (payload[1] as u32) << 8) + u16::from(cpu.regs.X) as u32
+                        > 0xffff
+                    {
+                        address.bank += 1;
+                        address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
+                            .wrapping_add(u16::from(cpu.regs.X));
+                    } else {
+                        address.address =
+                            (payload[0] as u16 | (payload[1] as u16) << 8) + u16::from(cpu.regs.X);
+                    }
+                }
+                return Some(address);
+            }
+            AddressModes::AbsoluteIndexedY => {
+                address.bank = cpu.regs.DBR;
+                if cpu.regs.P.x == 1 {
+                    if (payload[0] as u32 | (payload[1] as u32) << 8) + cpu.regs.Y.low as u32
+                        > 0xffff
+                    {
+                        address.bank += 1;
+                        address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
+                            .wrapping_add(cpu.regs.Y.low);
+                    } else {
+                        address.address =
+                            (payload[0] as u16 | (payload[1] as u16) << 8) + cpu.regs.Y.low;
+                    }
+                } else {
+                    if (payload[0] as u32 | (payload[1] as u32) << 8) + u16::from(cpu.regs.Y) as u32
+                        > 0xffff
+                    {
+                        address.bank += 1;
+                        address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
+                            .wrapping_add(u16::from(cpu.regs.Y));
+                    } else {
+                        address.address =
+                            (payload[0] as u16 | (payload[1] as u16) << 8) + u16::from(cpu.regs.Y);
+                    }
+                }
+                return Some(address);
+            }
+            AddressModes::AbsoluteLongIndexedX => {
+                let data = payload.as_slice();
 
-            // let mut number = (cpu.regs.DBR as u32) << 16 | (data[1] as u32) << 8 | data[0] as u32;
+                let bank = data[2];
+                let mut addr = (data[1] as u16) << 8 | data[0] as u16;
 
-            // if !cpu.e && cpu.regs.P.x == 0 {
-            //   // 16Bit
-            //   // TODO: byte_struct::ByteStructUnspecifiedByteOrder::read_bytes_default_le
-            //   number += cpu.regs.X as u16;
-            // } else {
-            //   // 8Bit
-            //   number += cpu.regs.X.low as u32;
-            // }
-            // return number as usize;
-            // }
+                // TODO: Wrapping? => Bank change?
+                if cpu.regs.P.x == 0 {
+                    addr = addr.wrapping_add(u16::from(cpu.regs.X));
+                } else {
+                    addr = addr.wrapping_add(cpu.regs.X.get_low() as u16);
+                }
+
+                address.bank = bank;
+                address.address = addr;
+                return Some(address);
+            }
+            AddressModes::AbsoluteIndexedIndirect => {
+                let op_low = payload[0];
+                let op_high = payload[1];
+
+                let x;
+                if cpu.regs.P.x == 1 || cpu.e {
+                    x = cpu.regs.X.low;
+                } else {
+                    x = u16::from(cpu.regs.X);
+                }
+                // TODO: increment bank on overflow like AbsoluteIndexed/XY?
+                let mut indirect_address = op_low as u16 | (op_high as u16) << 8;
+                // indirect_address += x;
+                if indirect_address as u32 + x as u32 > 0xffff {
+                    address.bank = cpu.regs.PBR /*+ 1*/;
+                    indirect_address = indirect_address.wrapping_add(x);
+                } else {
+                    address.bank = cpu.regs.PBR;
+                    indirect_address += x;
+                }
+
+                let addresss_low = bus.read(address);
+                let addresss_high = bus.read(address.add(1));
+
+                // cpu.regs.PC = (cpu.regs.PBR as u32) << 16 | (addresss_high as u32) << 8 | addresss_low as u32;
+                address.address = (addresss_high as u16) << 8 | addresss_low as u16;
+                return Some(address);
+            }
             AddressModes::AbsoluteLong => {
                 let op_low = payload[0];
                 let op_high = payload[1];
@@ -151,11 +234,29 @@ impl AddressModes {
                 return Some(address);
             }
             AddressModes::Implied => println!("Implied addressing"),
-            AddressModes::Immediate => println!("Immediate addressing"), // TODO: Return Payload as slice?
+            AddressModes::Immediate => {
+                println!("Immediate addressing");
+                if !cpu.e && (cpu.regs.P.m == 0 || cpu.regs.P.x == 0) && payload.capacity() == 2 {
+                    address.address = payload[0] as u16 | (payload[1] as u16) << 8;
+                } else {
+                    address.address = payload[0] as u16;
+                }
+                return Some(address);
+            } // TODO: Return Payload as slice?
             AddressModes::ProgrammCounterRelative => {
                 let offset: i8 = payload[0] as _;
                 let foo = offset as i16;
                 address.address = (foo as i32 + (cpu.regs.PC as i32)).try_into().unwrap();
+                address.bank = cpu.regs.PBR;
+                // return (((cpu.regs.PBR as u32) << 16) | address) as usize;
+                return Some(address);
+            }
+            AddressModes::ProgrammCounterRelativeLong => {
+                let offset = payload[0] as u16 | (payload[1] as u16) << 8;
+                let sign_offest = offset as i16;
+                address.address = (sign_offest as i32 + (cpu.regs.PC as i32))
+                    .try_into()
+                    .unwrap();
                 address.bank = cpu.regs.PBR;
                 // return (((cpu.regs.PBR as u32) << 16) | address) as usize;
                 return Some(address);
@@ -165,6 +266,34 @@ impl AddressModes {
                 let address = cpu.regs.PC + op_low as u16;
                 cpu.stack_push((address & 0x00ff) as u8);
                 cpu.stack_push(((address & 0xff00) >> 8) as u8);
+            }
+            AddressModes::StackRelative => {
+                address.address = payload[0] as u16 + u16::from(cpu.regs.S);
+                address.bank = 0;
+                return Some(address);
+            }
+            AddressModes::StackRelativeIndirectIndexedY => {
+                let val = payload[0] as u16 + u16::from(cpu.regs.S);
+                let mut addr = bus.read(Address {
+                    address: val,
+                    bank: 0,
+                }) as u16
+                    | (bus.read(
+                        Address {
+                            address: val,
+                            bank: 0,
+                        }
+                        .add(1),
+                    ) as u16)
+                        << 8;
+                if cpu.e || cpu.regs.P.x == 1 {
+                    addr += cpu.regs.Y.low;
+                } else {
+                    addr += u16::from(cpu.regs.Y);
+                }
+                address.address = addr;
+                address.bank = cpu.regs.DBR;
+                return Some(address);
             }
             AddressModes::StackInterrupt => {
                 if !cpu.e {
@@ -179,22 +308,200 @@ impl AddressModes {
                 // TODO: Eval this
                 let interrupt_vector;
                 if !cpu.e {
-                    interrupt_vector = mapper.cartridge.as_ref().unwrap().header.native_irq;
+                    interrupt_vector = bus.cartridge.as_ref().unwrap().header.native_irq;
                 } else {
-                    interrupt_vector = mapper.cartridge.as_ref().unwrap().header.emu_irq;
+                    interrupt_vector = bus.cartridge.as_ref().unwrap().header.emu_irq;
                 }
                 let load_address = Address {
                     bank: 0,
                     address: interrupt_vector,
                 };
-                let val_low = mapper.read(load_address);
-                let val_high = mapper.read(load_address.add(1));
+                let val_low = bus.read(load_address);
+                let val_high = bus.read(load_address.add(1));
 
                 address.address = (val_high as u16) << 8 | val_low as u16;
                 return Some(address);
             }
+            AddressModes::Accumulator => {}
             AddressModes::StackRTS => {}
+            AddressModes::StackRTL => {}
+            AddressModes::StackRTI => {}
             AddressModes::StackPush => {}
+            AddressModes::StackPull => {}
+            AddressModes::StackAbsolute => {}
+            AddressModes::DirectPage => {
+                address.address = u16::from(cpu.regs.D) + payload[0] as u16;
+                return Some(address);
+            }
+            AddressModes::DirectPageIndirect => {
+                let val = payload[0] as u16 + cpu.regs.D;
+                let addr_low = bus.read(Address {
+                    bank: 0,
+                    address: val,
+                });
+                let addr_high = bus.read(
+                    Address {
+                        bank: 0,
+                        address: val,
+                    }
+                    .add(1),
+                );
+
+                address.bank = cpu.regs.DBR;
+                address.address = addr_low as u16 | (addr_high as u16) << 8;
+                return Some(address);
+            }
+            AddressModes::DirectPageIndirectLong => {
+                let val = payload[0] as u16 + cpu.regs.D;
+                let addr_low = bus.read(Address {
+                    bank: 0,
+                    address: val,
+                });
+                let addr_high = bus.read(
+                    Address {
+                        bank: 0,
+                        address: val,
+                    }
+                    .add(1),
+                );
+                let bank = bus.read(
+                    Address {
+                        bank: 0,
+                        address: val,
+                    }
+                    .add(2),
+                );
+                address.bank = bank;
+                address.address = addr_low as u16 | (addr_high as u16) << 8;
+                return Some(address);
+            }
+            AddressModes::DirectPageIndirectIndexedY => {
+                if cpu.e || cpu.regs.P.x == 1 {
+                    let mut val;
+                    val = cpu.regs.D + payload[0] as u16;
+                    address.address = (bus.read(Address {
+                        bank: 0,
+                        address: val,
+                    }) as u16
+                        | (bus.read(
+                            Address {
+                                bank: 0,
+                                address: val,
+                            }
+                            .add(1),
+                        ) as u16)
+                            << 8)
+                        + cpu.regs.Y.low as u16;
+                    address.bank = cpu.regs.DBR;
+                } else {
+                    let mut val;
+                    val = cpu.regs.D + payload[0] as u16;
+                    address.address = (bus.read(Address {
+                        bank: 0,
+                        address: val,
+                    }) as u16
+                        | (bus.read(
+                            Address {
+                                bank: 0,
+                                address: val,
+                            }
+                            .add(1),
+                        ) as u16)
+                            << 8)
+                        + u16::from(cpu.regs.Y);
+                    address.bank = cpu.regs.DBR;
+                }
+                return Some(address);
+            }
+            AddressModes::DirectPageIndirectLongIndexedY => {
+                let indirect = cpu.regs.D + payload[0] as u16;
+                let addr_low = bus.read(Address {
+                    address: indirect,
+                    bank: 0,
+                });
+                let addr_high = bus.read(Address {
+                    address: indirect,
+                    bank: 0,
+                });
+                let addr_bank = bus.read(Address {
+                    address: indirect,
+                    bank: 0,
+                });
+                let index;
+                if cpu.e || cpu.regs.P.x == 1 {
+                    index = cpu.regs.Y.low;
+                } else {
+                    index = u16::from(cpu.regs.Y);
+                }
+                address.address = (addr_low as u16 | (addr_high as u16) << 8).wrapping_add(index);
+                address.bank = addr_bank;
+                return Some(address);
+            }
+            AddressModes::DirectPageIndexedX => {
+                let addr;
+                if cpu.e || cpu.regs.P.x == 1 {
+                    let D;
+                    if cpu.e {
+                        D = 0;
+                    } else {
+                        D = cpu.regs.D;
+                    }
+                    addr = payload[0] as u16 + D + cpu.regs.X.low;
+                } else {
+                    addr = payload[0] as u16 + cpu.regs.D + u16::from(cpu.regs.X);
+                }
+                address.address = addr;
+                address.bank = 0;
+                return Some(address);
+            }
+            AddressModes::DirectPageIndexedIndirectX => {
+                if cpu.e || cpu.regs.P.x == 1 {
+                    let mut val;
+                    // is it 0 in emu mode??
+                    val = 0u8;
+                    // val = cpu.regs.D;
+                    val += val
+                        .wrapping_add(cpu.regs.X.low as u8)
+                        .wrapping_add(payload[0]);
+                    let indirect = bus.read(Address {
+                        bank: 0,
+                        address: val as u16,
+                    }) as u16
+                        | (bus.read(
+                            Address {
+                                bank: 0,
+                                address: val as u16,
+                            }
+                            .add(1),
+                        ) as u16)
+                            << 8;
+                    address.bank = cpu.regs.DBR;
+                } else {
+                    let mut val;
+                    val = cpu.regs.D;
+                    val += u16::from(cpu.regs.X) + payload[0] as u16;
+                    address.address = bus.read(Address {
+                        bank: 0,
+                        address: val,
+                    }) as u16
+                        | (bus.read(
+                            Address {
+                                bank: 0,
+                                address: val,
+                            }
+                            .add(1),
+                        ) as u16)
+                            << 8;
+                    address.bank = cpu.regs.DBR;
+                }
+                return Some(address);
+            }
+            AddressModes::BlockMove => {
+                println!(
+                    "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
+                    self, opcode, cpu.regs
+                );
+            }
             _ => {
                 unimplemented!(
                     "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
@@ -261,8 +568,8 @@ pub fn get_gi_addr_mode(opcode: u8) -> Option<AddressModes> {
         GI_ADDR_MODE_DIRECT_ZERO_PAGE_INDEXED_INDIRECT_X => {
             Some(AddressModes::DirectPageIndexedIndirectX)
         }
-        GI_ADDR_MODE_DIRECT_ZERO_PAGE_INDEXED_INDIRECT_Y => {
-            Some(AddressModes::DirectPageIndexedIndirectY)
+        GI_ADDR_MODE_DIRECT_ZERO_PAGE_INDIRECT_INDEXED_Y => {
+            Some(AddressModes::DirectPageIndirectIndexedY)
         }
         GI_ADDR_MODE_DIRECT_PAGE_INDIRECT_LONG_INDEXED_Y => {
             Some(AddressModes::DirectPageIndirectLongIndexedY)

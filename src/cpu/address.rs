@@ -10,7 +10,8 @@ impl Address {
     pub fn add(&self, offset: usize) -> Address {
         Address {
             bank: self.bank,
-            address: self.address + offset as u16,
+            // TODO: wrapping add?
+            address: self.address.wrapping_add(offset as u16),
         }
     }
 }

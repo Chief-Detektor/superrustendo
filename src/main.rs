@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+use crate::mem::WRAM;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
@@ -11,7 +13,7 @@ pub mod tooling;
 
 use crate::cpu::decoder::*;
 use crate::cpu::*;
-use crate::mem::Mapper;
+use crate::mem::Bus;
 use crate::tooling::disassembler::PrintToken;
 
 fn main() -> std::io::Result<()> {
@@ -31,25 +33,26 @@ fn main() -> std::io::Result<()> {
 
     // TODO: Fix address offsets => rom mapping starts at 0x8000.. for bank 00
     // cpu.regs.PC = 0x4;
-    let mut mapper = Mapper {
+    let mut bus = Bus {
         cartridge: Some(card),
+        wram: WRAM::new(),
     };
 
-    let mut decoder = Decoder::new(&mut cpu, &mut mapper, true);
+    let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
 
-    let mut labels = HashMap::new();
-    let mut decoded_asm = Vec::new();
+    // let mut labels = HashMap::new();
+    // let mut decoded_asm = Vec::new();
 
     for (i, instr) in decoder.enumerate() {
         instr.print_info();
-        decoded_asm.push((instr.address, instr.print(&mut labels)));
-        if i == 200 {
-            break;
-        }
+        // decoded_asm.push((instr.address, instr.print(&mut labels)));
+        // if i == 400 {
+        //     break;
+        // }
     }
 
-    println!();
-    println!("Dissassembled code:");
+    // println!();
+    // println!("Dissassembled code:");
 
     // for (address, line) in decoded_asm.iter_mut() {
     //   if labels.contains_key(&(*address as usize)) {
@@ -61,19 +64,19 @@ fn main() -> std::io::Result<()> {
     //   // println!("{:#x}: {}", address, line);
     // }
 
-    println!("Labels:");
-    for (k, l) in &labels {
-        println!("At {:0x}: {}", k, l);
-    }
+    // println!("Labels:");
+    // for (k, l) in &labels {
+    //     println!("At {:0x}: {}", k, l);
+    // }
 
-    for (address, line) in decoded_asm {
-        // labels
-        if labels.contains_key(&(address as usize)) {
-            let label = labels.get(&(address as usize)).unwrap();
-            println!("{}:", label);
-        }
-        println!("\t{:#x}:\t{}", address, line);
-    }
+    // for (address, line) in decoded_asm {
+    //     // labels
+    //     if labels.contains_key(&(address as usize)) {
+    //         let label = labels.get(&(address as usize)).unwrap();
+    //         println!("{}:", label);
+    //     }
+    //     println!("\t{:#x}:\t{}", address, line);
+    // }
 
     Ok(())
 }
