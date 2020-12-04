@@ -47,27 +47,35 @@ coverage:cargo:
   tags:
     - docker
   script:
-    # - export RUSTFLAGS="-Zinstrument-coverage"
-    # - cargo build --verbose
-    # - LLVM_PROFILE_FILE="superrustendo-%p-%m.profraw" cargo test --verbose
-    # - grcov . --binary-path ./target/debug/superrustendo -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o lcov.info
-    # - genhtml -o ./target/cov/ --show-details --highlight --ignore-errors source --legend lcov.info
-    - ./coverage.sh
+    # - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
+    - export RUSTFLAGS="-Zinstrument-coverage"
+    - cargo build --verbose
+    - LLVM_PROFILE_FILE="superrustendo-%p-%m.profraw" cargo test --verbose
+    - grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o lcov.info
+    - genhtml -o ./target/cov/ --show-details --highlight --ignore-errors source --legend lcov.info
+  cache:
+    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+    paths:
+      - target/debug
+      - target/release
+      - target/cov
+    policy: pull
   artifacts:
     paths:
       - target/cov
 
-# doc:cargo:
-#   stage: build
-#   image: $CI_REGISTRY_IMAGE
-#   tags:
-#     - docker
-#   script:
-#     - cargo doc --no-deps
-#   cache:
-#     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
-#     paths:
-#       - target/doc
+doc:cargo:
+  stage: build
+  image: rust:latest
+  tags:
+    - docker
+  script:
+    - rustup default nightly
+    - cargo doc --no-deps
+  cache:
+    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+    paths:
+      - target/doc
 
 build:cargo:
   stage: build
@@ -103,15 +111,25 @@ pages:
   image: $CI_REGISTRY_IMAGE
   dependencies:
     - coverage:cargo
-    # - doc:cargo
+    - doc:cargo
   script:
-    - mkdir public
-    - mv target/cov public/cov
-    - mv target/doc public/doc
-    - mv pages.html public/index.html
+    # - find target/cov -xtype l -delete
+    # - mkdir -p public/$CI_COMMIT_REF_NAME
+    - mv target/cov public/
+    # - echo '<html>
+    #   <body>
+    #   <a href="./doc">documentation</a></br>
+    #   <a href="./develop">develop</a></br>
+    #   <a href="./master">main</a></br>
+    #   <a href="./$CI_COMMIT_REF_NAME">$CI_COMMIT_REF_NAME</a></br>
+    #   </body>
+    #   </html>' > public/index.html
+    # - mv target/doc public/doc
+    # - mv test_results.json public
+    # - mv bench_results.json public
   artifacts:
     paths:
       - public
     expire_in: 30 days
-  # only:
-  #   - master
+  only:
+    - master
