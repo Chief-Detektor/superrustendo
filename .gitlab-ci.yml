@@ -178,12 +178,10 @@ pages:
     - coverage:cargo
     - doc:cargo
   script:
-    # - find target/cov -xtype l -delete
     - mkdir public
     - mv target/cov public/cov
     - mv target/doc public/doc
-    # - mv test_results.json public
-    # - mv bench_results.json public
+    - mv pages.html public/index.html
   cache:
     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
     paths:
