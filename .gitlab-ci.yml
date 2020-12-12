@@ -179,8 +179,9 @@ pages:
     - doc:cargo
   script:
     # - find target/cov -xtype l -delete
+    - mkdir public
     - mv target/cov public/cov
-    - mv target/doc public.doc
+    - mv target/doc public/doc
     # - mv test_results.json public
     # - mv bench_results.json public
   cache:
