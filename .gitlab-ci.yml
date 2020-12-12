@@ -176,7 +176,7 @@ pages:
   image: $CI_REGISTRY_IMAGE
   dependencies:
     - coverage:cargo
-    # - doc:cargo
+    - doc:cargo
   script:
     # - find target/cov -xtype l -delete
     - mv target/cov public/cov
@@ -187,7 +187,7 @@ pages:
     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
     paths:
       - target
-    policy: push
+    policy: pull
   artifacts:
     paths:
       - public
