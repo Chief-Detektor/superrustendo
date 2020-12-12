@@ -62,11 +62,6 @@ doc:cargo:
     - docker
   script:
     - cargo doc --no-deps
-  cache:
-    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
-    paths:
-      - target/doc
-    policy: push
   artifacts:
     paths:
       - target/doc
