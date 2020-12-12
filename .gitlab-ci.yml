@@ -1,39 +1,7 @@
-# This file is a template, and might need editing before it works on your project.
-# Official language image. Look for the different tagged releases at:
-# https://hub.docker.com/r/library/rust/tags/
-# image:
-#   docker
-# $CI_REGISTRY_IMAGE
-
-# Optional: Pick zero or more services to be used on all builds.
-# Only needed when using a docker container to run your tests in.
-# Check out: http://docs.gitlab.com/ce/ci/docker/using_docker_images.html#what-is-a-service
-# services:
-#   - mysql:latest
-#   - redis:latest
-#   - postgres:latest
-
-# Optional: Install a C compiler, cmake and git into the container.
-# You will often need this when you (or any of your dependencies) depends on C code.
-# before_script:
-#   - apt-get update -yqq
-#   - apt-get install -yqq --no-install-recommends build-essential
-
-# Use cargo to test the project
-# before_script:
-#   - rustup update nightly && rustup default nightly
-#   - rustup default nightly
-#   - apt-get update -yqq
-#   - apt-get install -yqq --no-install-recommends zip lcov
-
-# before_script:
-# - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-
 services:
   - docker:dind
 
 stages:
-  # - setup
   - test
   - build
   - deploy
@@ -42,44 +10,16 @@ variables:
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: ""
 
-# prepare:
-#   stage: setup
-#   image: $CI_REGISTRY_IMAGE
-#   tags:
-#     - docker
-#   cache:
-#     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
-#     paths:
-#       - target/debug/deps
-#       - target/release/deps
-#   script:
-#     - rustup default nightly
-#     - rustup update
-#     # - cargo build +nightly
-
 test:cargo:
   stage: test
   image: $CI_REGISTRY_IMAGE
   tags:
     - docker
   script:
-    # - rustup default nightly
     - rustc --version && cargo --version # Print version info for debugging
     - export CARGO_INCREMENTAL=0
     - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
     - cargo test --verbose $CARGO_OPTIONS
-    # make it a vaild json
-    # - ./format_json.sh test_results.json
-  cache:
-    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
-    paths:
-      - target/debug/deps
-      - target/release/deps
-    policy: pull
-    # artifacts:
-    #   paths:
-    #     - test_results.json
-    # expire_in: 30 days
 
 # benchmark:cargo:
 #   stage: test
@@ -111,15 +51,9 @@ coverage:cargo:
     - cargo build
     - grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./target/debug/lcov.info
     - genhtml -o ./target/cov/ --show-details --highlight --ignore-errors source --legend ./target/debug/lcov.info
-  cache:
-    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
-    paths:
-      - target
-    policy: push
   artifacts:
     paths:
       - target/cov
-  #   expire_in: 30 days
 
 doc:cargo:
   stage: build
@@ -145,11 +79,6 @@ build:cargo:
   script:
     - cargo build --release
     - strip target/release/{superrustendo,snesdbg,snesdis}
-  cache:
-    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
-    paths:
-      - target
-    policy: pull
   artifacts:
     paths:
       - target/release/{superrustendo,snesdbg,snesdis}
@@ -165,8 +94,8 @@ docker:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker build -t $CI_REGISTRY_IMAGE .
     - docker push $CI_REGISTRY_IMAGE
-  # only:
-  # - master
+  only:
+    - master
 # TODO: Build release image containing only alpine and build binaries
 
 pages:
@@ -182,11 +111,6 @@ pages:
     - mv target/cov public/cov
     - mv target/doc public/doc
     - mv pages.html public/index.html
-  cache:
-    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
-    paths:
-      - target
-    policy: pull
   artifacts:
     paths:
       - public
