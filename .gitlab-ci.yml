@@ -114,25 +114,28 @@ coverage:cargo:
   cache:
     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
     paths:
-      - target/debug
-      - target/release
-    policy: pull
+      - target
+    policy: push
   artifacts:
     paths:
       - target/cov
   #   expire_in: 30 days
 
-# doc:cargo:
-#   stage: build
-#   image: $CI_REGISTRY_IMAGE
-#   tags:
-#     - docker
-#   script:
-#     - cargo doc --no-deps
-#   cache:
-#     key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
-#     paths:
-#       - target/doc
+doc:cargo:
+  stage: build
+  image: $CI_REGISTRY_IMAGE
+  tags:
+    - docker
+  script:
+    - cargo doc --no-deps
+  cache:
+    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+    paths:
+      - target/doc
+    policy: push
+  artifacts:
+    paths:
+      - target/doc
 
 build:cargo:
   stage: build
@@ -142,6 +145,11 @@ build:cargo:
   script:
     - cargo build --release
     - strip target/release/{superrustendo,snesdbg,snesdis}
+  cache:
+    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+    paths:
+      - target
+    policy: pull
   artifacts:
     paths:
       - target/release/{superrustendo,snesdbg,snesdis}
@@ -172,9 +180,14 @@ pages:
   script:
     # - find target/cov -xtype l -delete
     - mv target/cov public/cov
-    - mv target/doc
+    - mv target/doc public.doc
     # - mv test_results.json public
     # - mv bench_results.json public
+  cache:
+    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+    paths:
+      - target
+    policy: push
   artifacts:
     paths:
       - public
