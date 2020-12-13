@@ -50,7 +50,7 @@ coverage:cargo:
     - export RUSTFLAGS="-Zinstrument-coverage"
     - cargo build --verbose
     - LLVM_PROFILE_FILE="superrustendo-%p-%m.profraw" cargo test --verbose
-    - grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o lcov.info
+    - grcov . --binary-path ./target/debug/superrustendo -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o lcov.info
     - genhtml -o ./target/cov/ --show-details --highlight --ignore-errors source --legend lcov.info
   artifacts:
     paths:
