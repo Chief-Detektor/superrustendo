@@ -42,7 +42,7 @@ llvm-profdata merge -sparse target/debug/superrustendo*.profraw -o target/debug/
 
 
 cargo cov -- report \
-    --use-color --ignore-filename-regex='/.cargo/registry' --ignore-filename-regex='tests/' \
+    --use-color --ignore-filename-regex='/.cargo/registry' --ignore-filename-regex='tests/' --ignore-filename-regex='/usr/local/cargo' \
     --instr-profile=target/debug/superrustendo.profdata \
     --object `find target/debug/deps -name "decoder*" | grep -v '\.'` \
     --object `find target/debug/deps -name "instructions*" | grep -v '\.'` \
