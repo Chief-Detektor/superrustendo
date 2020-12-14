@@ -2,7 +2,10 @@
 macro_rules! opcode_test {
     ($raw_byte:expr, $opcode:expr, $addressmode:expr) => {{
         let mut c = CPU::new();
-        let mut m = Bus { cartridge: None, wram: WRAM::new() };
+        let mut m = Bus {
+            cartridge: None,
+            wram: WRAM::new(),
+        };
         let d = Decoder::new(&mut c, &mut m, false);
         let result = d.decode($raw_byte);
         let res = result.unwrap();
@@ -18,12 +21,12 @@ mod tests {
 
     // extern crate snes_sim;
     extern crate superrustendo;
-    use superrustendo::mem::WRAM;
     use superrustendo::cpu::addressmodes::AddressModes;
     use superrustendo::cpu::decoder::Decoder;
     use superrustendo::cpu::decoder::Opcodes;
     use superrustendo::cpu::CPU;
     use superrustendo::mem::Bus;
+    use superrustendo::mem::WRAM;
     #[test]
     fn brk() {
         opcode_test!(0x0, Opcodes::BRK, AddressModes::StackInterrupt);

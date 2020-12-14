@@ -44,15 +44,13 @@ llvm-profdata merge -sparse target/debug/superrustendo*.profraw -o target/debug/
 cargo cov -- report \
     --use-color --ignore-filename-regex='/.cargo/registry' --ignore-filename-regex='tests/' --ignore-filename-regex='/usr/local/cargo' \
     --instr-profile=target/debug/superrustendo.profdata \
-    --object `find target/debug/deps -name "decoder*" | grep -v '\.'` \
-    --object `find target/debug/deps -name "instructions*" | grep -v '\.'` \
+    --object `find target/debug/deps -name "mod*" | grep -v '\.'` \
     --Xdemangler=rustfilt | grep -E '^TOTAL' | grep '[[:alnum:]]*\.[[:alnum:]]*%' -o | head -n1 | xargs echo Coverage:
 
 cargo cov -- show \
     --use-color --ignore-filename-regex='/.cargo/registry' --ignore-filename-regex='tests/' --ignore-filename-regex='/usr/local/cargo' \
     --instr-profile=target/debug/superrustendo.profdata \
-    --object `find target/debug/deps -name "decoder*" | grep -v '\.'` \
-    --object `find target/debug/deps -name "instructions*" | grep -v '\.'` \
+    --object `find target/debug/deps -name "mod*" | grep -v '\.'` \
     --show-instantiations --show-line-counts-or-regions \
     --Xdemangler=rustfilt -format=html -o target/cov
 
