@@ -58,8 +58,8 @@ cargo cov -- report \
       done \
     ) \
   --use-color --ignore-filename-regex='/.cargo/registry' --ignore-filename-regex='tests/' --ignore-filename-regex='/usr/local/cargo' \
-  --instr-profile=target/debug/superrustendo.profdata --summary-only # and/or other options
-
+  --instr-profile=target/debug/superrustendo.profdata --summary-only \
+  | grep -E '^TOTAL' | grep '[[:alnum:]]*\.[[:alnum:]]*%' -o | head -n1 | xargs echo Coverage
 
 cargo cov -- show \
      $( \
