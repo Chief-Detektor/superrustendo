@@ -37,32 +37,46 @@ rustup component add llvm-tools-preview
 export RUSTFLAGS="-Zinstrument-coverage"
 # cargo build --bin superrustendo --verbose
 cargo build --verbose
+RUSTFLAGS="-Zinstrument-coverage" \
+RUSTDOCFLAGS="-Zinstrument-coverage -Zunstable-options --persist-doctests target/debug/doctestbins" \
 LLVM_PROFILE_FILE="target/debug/superrustendo-%p-%m.profraw" cargo test --verbose
 llvm-profdata merge -sparse target/debug/superrustendo*.profraw -o target/debug/superrustendo.profdata
 
-
 cargo cov -- report \
-    --use-color --ignore-filename-regex='/.cargo/registry' --ignore-filename-regex='tests/' --ignore-filename-regex='/usr/local/cargo' \
-    --instr-profile=target/debug/superrustendo.profdata \
-    --object `find target/debug/deps -name "mod*" | grep -v '\.'` \
-    --Xdemangler=rustfilt | grep -E '^TOTAL' | grep '[[:alnum:]]*\.[[:alnum:]]*%' -o | head -n1 | xargs echo Coverage:
+    $( \
+      for file in \
+        $( \
+          RUSTFLAGS="-Zinstrument-coverage" \
+          RUSTDOCFLAGS="-Zinstrument-coverage -Zunstable-options --persist-doctests target/debug/doctestbins" \
+            cargo test --no-run --message-format=json \
+              | jq -r "select(.profile.test == true) | .filenames[]" \
+              | grep -v dSYM - \
+        ) \
+        target/debug/doctestbins/*/rust_out; \
+      do \
+        [[ -x $file ]] && printf "%s %s " -object $file; \
+      done \
+    ) \
+  --use-color --ignore-filename-regex='/.cargo/registry' --ignore-filename-regex='tests/' --ignore-filename-regex='/usr/local/cargo' \
+  --instr-profile=target/debug/superrustendo.profdata --summary-only # and/or other options
+
 
 cargo cov -- show \
-    --use-color --ignore-filename-regex='/.cargo/registry' --ignore-filename-regex='tests/' --ignore-filename-regex='/usr/local/cargo' \
+     $( \
+      for file in \
+        $( \
+          RUSTFLAGS="-Zinstrument-coverage" \
+          RUSTDOCFLAGS="-Zinstrument-coverage -Zunstable-options --persist-doctests target/debug/doctestbins" \
+            cargo test --no-run --message-format=json \
+              | jq -r "select(.profile.test == true) | .filenames[]" \
+              | grep -v dSYM - \
+        ) \
+        target/debug/doctestbins/*/rust_out; \
+      do \
+        [[ -x $file ]] && printf "%s %s " -object $file; \
+      done \
+    ) \
     --instr-profile=target/debug/superrustendo.profdata \
-    --object `find target/debug/deps -name "mod*" | grep -v '\.'` \
     --show-instantiations --show-line-counts-or-regions \
+    --use-color --ignore-filename-regex='/.cargo/registry' --ignore-filename-regex='tests/' --ignore-filename-regex='/usr/local/cargo' \
     --Xdemangler=rustfilt -format=html -o target/cov
-
-    # --object target/debug/deps/* \
-    # --object target/debug/deps/* \
-# grcov . --binary-path ./target/debug/superrustendo -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o lcov.info
-# genhtml -o ./target/cov/ --show-details --highlight --ignore-errors source --legend lcov.info
-
-
-
-    # - export RUSTFLAGS="-Zinstrument-coverage"
-    # - cargo build --verbose
-    # - LLVM_PROFILE_FILE="superrustendo-%p-%m.profraw" cargo test --verbose
-    # - grcov . --binary-path ./target/debug/superrustendo -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o lcov.info
-    # - genhtml -o ./target/cov/ --show-details --highlight --ignore-errors source --legend lcov.info
