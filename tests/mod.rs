@@ -1,2 +1,2 @@
-mod instructions;
 mod decoder;
+mod instructions;

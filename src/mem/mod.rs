@@ -2,6 +2,7 @@ pub mod wram;
 
 use crate::cartridge::{Cartridge, RomTypes};
 use crate::cpu::address::Address;
+use crate::ppu::PPU;
 
 pub struct WRAM {
     lowRam: [u8; 0x2000],  // bank: 0x0-3f (shadowed from 0x7e) 0x0000-0x1fff
@@ -25,6 +26,7 @@ impl WRAM {
 pub struct Bus {
     pub cartridge: Option<Cartridge>,
     pub wram: WRAM,
+    // pub ppu: PPU,
 }
 
 impl Bus {
@@ -63,7 +65,7 @@ impl Bus {
         );
         match address.address {
             0x0000..=0x1fff => {
-                // println!("WRAM write");
+                println!("WRAM write");
                 self.wram.lowRam[address.address as usize] = data;
             }
             0x2100 => {

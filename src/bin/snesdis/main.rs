@@ -4,7 +4,7 @@ use std::env;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 
-use superrustendo::cpu::decoder::*;
+use superrustendo::{cpu::decoder::*, ppu::PPU};
 use superrustendo::cpu::*;
 use superrustendo::mem::Bus;
 use superrustendo::tooling::disassembler::PrintToken;
@@ -29,6 +29,7 @@ fn main() -> std::io::Result<()> {
     let mut bus = Bus {
         cartridge: Some(card),
         wram: WRAM::new(),
+        // ppu: PPU::new(),
     };
 
     let decoder = Decoder::new(&mut cpu, &mut bus, true);

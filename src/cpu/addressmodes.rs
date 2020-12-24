@@ -68,7 +68,7 @@ impl AddressModes {
             AddressModes::DirectPageIndirectLongIndexedY => 2,
             AddressModes::Immediate => {
                 match *op {
-                    Opcodes::LDX | Opcodes::CPX => {
+                    Opcodes::LDX | Opcodes::CPX | Opcodes::LDY => {
                         if regs.P.x != 1 {
                             return 3;
                         }
@@ -233,7 +233,10 @@ impl AddressModes {
                 address.bank = payload[2];
                 return Some(address);
             }
-            AddressModes::Implied => println!("Implied addressing"),
+            AddressModes::Implied => {
+                println!("Implied addressing");
+                return None;
+            }
             AddressModes::Immediate => {
                 println!("Immediate addressing");
                 if !cpu.e && (cpu.regs.P.m == 0 || cpu.regs.P.x == 0) && payload.capacity() == 2 {
