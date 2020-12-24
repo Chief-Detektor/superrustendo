@@ -14,11 +14,13 @@ use std::env;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 use std::string::String;
-use superrustendo::cpu::decoder::Decoder;
+use superrustendo::{cpu::decoder::Decoder, ppu::PPU};
 use superrustendo::cpu::instructions::Instruction;
 use superrustendo::cpu::*;
 use superrustendo::mem::Bus;
 use superrustendo::{cartridge::Cartridge, mem::WRAM};
+
+extern crate hex;
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -38,6 +40,7 @@ fn main() -> Result<()> {
     let mut bus = Bus {
         cartridge: Some(card),
         wram: WRAM::new(),
+        // ppu: PPU::new(),
     };
 
     // pretty self explainatory
@@ -76,6 +79,18 @@ fn print_instruction(inst: Option<Instruction>) {
 fn eval_line(line: String, decoder: &mut Decoder) -> bool {
     let mut command = line.split_whitespace();
     match command.next() {
+        Some("b" | "break") => {
+            if let Some(addr) = command.next() {
+                let val = hex::decode(addr);
+                match val {
+                    Ok(v) => {
+                        println!("Value: {:?} hex: {:x}{:x}", v, v[0],v[1]);
+                    }
+                    Err(_) => {}
+                }
+                // println!("Adding breakpoint at {:x}", hex::encode(&addr).parse::<u64>().unwrap());
+            }
+        }
         Some("s" | "step") => {
             match command.next() {
                 Some(steps) => {

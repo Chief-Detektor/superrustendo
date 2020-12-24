@@ -161,15 +161,15 @@ impl Cartridge {
             header: SnesHeader::default(),
         };
 
-        if let Some(header) = card.load_header(hi_rom) {
-            println!(r#"Hi Rom Detected"#);
-            card.header = header;
-            card.rom_type = Some(RomTypes::HiRom);
-            return Ok(card);
-        } else if let Some(header) = card.load_header(low_rom) {
+        if let Some(header) = card.load_header(low_rom) {
             println!(r#"Low Rom Detected"#);
             card.header = header;
             card.rom_type = Some(RomTypes::LowRom);
+            return Ok(card);
+        } else if let Some(header) = card.load_header(hi_rom) {
+            println!(r#"Hi Rom Detected"#);
+            card.header = header;
+            card.rom_type = Some(RomTypes::HiRom);
             return Ok(card);
         } else {
             println!(r#"No header found"#);
@@ -181,6 +181,8 @@ impl Cartridge {
         let mut header = self.read_bytes(address, 0x40);
         let raw = header.as_mut_slice();
         let snes_header = SnesHeader::read_bytes(&raw[..]);
+
+        println!("{:?}", snes_header);
 
         // TODO: This looks awfull
         let mut i = 0;
