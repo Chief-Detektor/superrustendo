@@ -232,8 +232,8 @@ impl Default for StatusRegister {
 bitfields!(
   #[derive(PartialEq, Copy, Clone)]
   pub Accumulator: u16 {
-    pub A: 8,
-    pub B: 8,
+    A: 8,
+    B: 8,
   }
 );
 
@@ -246,6 +246,23 @@ impl fmt::Debug for Accumulator {
 impl Default for Accumulator {
     fn default() -> Accumulator {
         Accumulator { A: 0, B: 0 }
+    }
+}
+
+impl Accumulator {
+    pub fn get_A(&self) -> u8 {
+        return self.A as u8;
+    }
+    pub fn get_B(&self) -> u8 {
+        return self.B as u8;
+    }
+    pub fn set_A(&mut self, A: u8) -> &mut Self {
+        self.A = A.into();
+        self
+    }
+    pub fn set_B(&mut self, B: u8) -> &mut Self {
+        self.B = B.into();
+        self
     }
 }
 

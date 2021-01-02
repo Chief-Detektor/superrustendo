@@ -30,14 +30,14 @@ mod tests {
         {
             // Emulation mode
             cpu.set_emulation_mode(true); // Values anded are 8-Bit
-            cpu.get_regs().set_C(&Accumulator::from(0b00001001 as u16));
+            cpu.get_regs().set_C(&Accumulator::from(0b00000001 as u16));
             println!("{:?}", cpu.get_regs().get_C());
 
             let mut i = Instruction {
                 address: 0x0,
                 opcode: Opcodes::AND,
                 // payload: vec![0b11110011],
-                payload: vec![0b1111],
+                payload: vec![0x0f],
                 address_mode: AddressModes::Immediate,
                 length: 2,
                 cycles: 2,
@@ -47,10 +47,10 @@ mod tests {
 
             // println!("{:?}", cpu)
             // println!("{:?}", cpu.get_regs());
-            println!("{:?}", cpu.get_regs().get_C().A);
+            println!("{:?}", cpu.get_regs().get_C().get_A());
 
             // 00110000 & 11110011 => 00110000 right?
-            assert!(cpu.get_regs().get_C().A as u8 == 0b1001 as u8);
+            assert!(cpu.get_regs().get_C().get_A() as u8 == 1 as u8);
             assert!(cpu.get_regs().get_P().get_n() == 0);
             assert!(cpu.get_regs().get_P().get_z() == 0);
         }
@@ -70,34 +70,34 @@ mod tests {
 
             i.execute(&mut cpu, &mut bus, false);
 
-            assert!(cpu.get_regs().get_C().A as u8 == 0b00000000 as u8);
+            assert!(cpu.get_regs().get_C().get_A() as u8 == 0b00000000 as u8);
             assert!(cpu.get_regs().get_P().get_n() == 0);
             assert!(cpu.get_regs().get_P().get_z() == 1);
         }
-        // {
-        //     // Emulation mode
-        //     cpu.set_emulation_mode(false); // Values anded are 16-Bit
-        //     cpu.get_regs().set_C(&Accumulator::from(0b11110000 as u16));
-        //     cpu.get_regs().get_P().set_x(1);
+        {
+            // Emulation mode
+            cpu.set_emulation_mode(false); // Values anded are 16-Bit
+            cpu.get_regs().set_C(&Accumulator::from(0xff00 as u16));
+            cpu.get_regs().get_P().set_m(0);
 
-        //     println!("{:?}", cpu.get_regs().get_C());
-        //     let mut i = Instruction {
-        //         address: 0x0,
-        //         opcode: Opcodes::AND,
-        //         payload: vec![0b1000,0b1000],
-        //         address_mode: AddressModes::Immediate,
-        //         length: 3,
-        //         cycles: 2,
-        //     };
+            println!("{:?}", cpu.get_regs());
+            let mut i = Instruction {
+                address: 0x0,
+                opcode: Opcodes::AND,
+                payload: vec![0xff,0xff],
+                address_mode: AddressModes::Immediate,
+                length: 3,
+                cycles: 2,
+            };
 
-        //     println!("{:?}", cpu.get_regs().get_C());
-        //     i.execute(&mut cpu, &mut bus, false);
+            i.execute(&mut cpu, &mut bus, false);
+            println!("{:?}", cpu.get_regs());
 
-        //     println!("{:?}", cpu.get_regs().get_C());
-        //     assert!(u16::from(*cpu.get_regs().get_C()) == 0b10000000);
-        //     assert!(cpu.get_regs().get_P().get_n() == 1);
-        //     assert!(cpu.get_regs().get_P().get_z() == 0);
-        // }
+            println!("{:?}", cpu.get_regs().get_C());
+            assert!(u16::from(*cpu.get_regs().get_C()) == 0xff00);
+            assert!(cpu.get_regs().get_P().get_n() == 1);
+            assert!(cpu.get_regs().get_P().get_z() == 0);
+        }
         // {
         //     // Emulation mode
         //     cpu.set_emulation_mode(false); // Values anded are 8-Bit
