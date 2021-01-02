@@ -517,10 +517,13 @@ impl Iterator for Decoder<'_> {
             .decode(self.bus.read(address).try_into().unwrap())
             .unwrap();
 
-        let payload = self.bus.cartridge.as_ref().unwrap().read_bytes(
-            (self.cpu.regs.PC as u32 + 1) as usize, // The payload starts 1 after opcode
-            inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
-        );
+        // let payload = self.bus.cartridge.as_ref().unwrap().read_bytes(
+        //     (self.cpu.regs.PC as u32 + 1) as usize, // The payload starts 1 after opcode
+        //     inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
+        // );
+        let payload = self
+            .bus
+            .read_bytes(address.add(1), inst.1.len(&self.cpu.regs, &inst.0) - 1);
 
         let mut instr = Instruction::new();
         instr.address = self.cpu.regs.PC as _;

@@ -25,3 +25,9 @@ impl fmt::Debug for Address {
         )
     }
 }
+
+impl From<Address> for u16 {
+    fn from(a: Address) -> Self {
+        a.address
+    }
+}

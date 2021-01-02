@@ -73,7 +73,7 @@ impl AddressModes {
                             return 3;
                         }
                     }
-                    Opcodes::LDA | Opcodes::BIT => {
+                    Opcodes::LDA | Opcodes::BIT | Opcodes::AND => {
                         if regs.P.m == 0 {
                             return 3;
                         }

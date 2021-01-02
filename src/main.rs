@@ -11,8 +11,8 @@ use std::path::Path;
 pub mod cartridge;
 pub mod cpu;
 pub mod mem;
-pub mod tooling;
 pub mod ppu;
+pub mod tooling;
 
 use crate::cpu::decoder::*;
 use crate::cpu::*;
