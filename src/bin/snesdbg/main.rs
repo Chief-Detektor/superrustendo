@@ -14,11 +14,11 @@ use std::env;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 use std::string::String;
-use superrustendo::{cpu::decoder::Decoder, ppu::PPU};
 use superrustendo::cpu::instructions::Instruction;
 use superrustendo::cpu::*;
 use superrustendo::mem::Bus;
 use superrustendo::{cartridge::Cartridge, mem::WRAM};
+use superrustendo::{cpu::decoder::Decoder, ppu::PPU};
 
 extern crate hex;
 
@@ -84,7 +84,7 @@ fn eval_line(line: String, decoder: &mut Decoder) -> bool {
                 let val = hex::decode(addr);
                 match val {
                     Ok(v) => {
-                        println!("Value: {:?} hex: {:x}{:x}", v, v[0],v[1]);
+                        println!("Value: {:?} hex: {:x}{:x}", v, v[0], v[1]);
                     }
                     Err(_) => {}
                 }

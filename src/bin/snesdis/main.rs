@@ -4,11 +4,11 @@ use std::env;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 
-use superrustendo::{cpu::decoder::*, ppu::PPU};
 use superrustendo::cpu::*;
 use superrustendo::mem::Bus;
 use superrustendo::tooling::disassembler::PrintToken;
 use superrustendo::{cartridge::Cartridge, mem::WRAM};
+use superrustendo::{cpu::decoder::*, ppu::PPU};
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
