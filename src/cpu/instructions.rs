@@ -19,38 +19,114 @@ pub struct Instruction {
     pub cycles: usize,
 }
 
+#[derive(Debug)]
+enum Operant_Value {
+    short(u8),
+    long(u32),
+}
+
+impl Operant_Value {
+    fn lower_to_number(&self) -> u32 {
+        match *self {
+            Operant_Value::short(a) => {
+                return a as u32;
+            }
+            Operant_Value::long(a) => {
+                return a;
+            }
+        }
+    }
+}
+
+fn is_16_bit_mem_and_accu(cpu: &CPU) -> bool {
+    !cpu.e && cpu.regs.P.m != 1
+}
+fn is_16_bit_index(cpu: &CPU) -> bool {
+    !cpu.e && cpu.regs.P.x != 1
+}
+
 impl Instruction {
     pub fn new() -> Instruction {
         let inst = Instruction::default();
         inst
     }
-    // pub fn new(opcode: u8) -> Instruction {}
+
+    fn load_value(&self, cpu: &mut CPU, bus: &Bus) -> Option<Operant_Value> {
+        // if self.address_mode == AddressModes::Immediate {
+        //     if is_16_bit_mem_and_accu(cpu) && self.address_mode.len(cpu.get_regs(), &self.opcode) > 3 {
+        //         return Some(Operant_Value::long(self.payload[0] as u16 | (self.payload[1] as u16) << 8));
+        //     } else {
+        //         return Some(Operant_Value::short(self.payload[0]));
+        //     }
+        // } else {
+        // get address
+        let address =
+            self.address_mode
+                .get_effective_address(cpu, &self.payload, &self.opcode, bus);
+        if address.is_some() {
+            if !is_16_bit_mem_and_accu(cpu) {
+                let val = bus.read(address.unwrap());
+                return Some(Operant_Value::short(val));
+            } else {
+                let val =
+                    bus.read(address.unwrap()) as u32 | (bus.read(address.unwrap()) as u32) << 8; //| (cpu.regs.PBR as u32) << 16;
+                return Some(Operant_Value::long(val));
+            }
+        } else {
+            return None;
+        }
+        // }
+    }
+
+    // TODO: Make this clean.
+    // 1. Introduce variable value
+    // 2. Is addressing mode immediate?
+    // - if yes then payload is value
+    // - if not then load value from address and save it to value
     pub fn execute(&mut self, mut cpu: &mut CPU, bus: &mut Bus, follow_jumps: bool) {
-        // Get the correct address for instruction
+        // if this is None it's implied addressing
+        let value;
+        if self.address_mode != AddressModes::Immediate {
+            value = self.load_value(cpu, bus);
+        } else {
+            let address =
+                self.address_mode
+                    .get_effective_address(cpu, &self.payload, &self.opcode, bus);
+
+            if let Some(a) = address {
+                print!("{:?}", <u16>::from(a));
+                value = Some(Operant_Value::long(<u16>::from(a) as u32));
+            } else {
+                value = None;
+            }
+        }
+        println!("{:?}", value);
+
         let effective_address =
             self.address_mode
-                .get_effective_address(&mut cpu, &self.payload, &self.opcode, &bus);
-
-        if effective_address.is_some() {
-            println!("Calculated effective address: {:?}", effective_address);
-        }
+                .get_effective_address(cpu, &self.payload, &self.opcode, bus);
 
         match &self.opcode {
+            // TODO: handle immediate addressing early in such a way that the folloing patterns use it transparently/agnistically
             Opcodes::AND => {
-                if cpu.e || cpu.regs.P.m == 1 {
-                    let val = bus.read(effective_address.unwrap());
-                    cpu.regs.C = Accumulator::from(cpu.regs.C.A & val as u16);
-                } else {
-                    let low = bus.read(effective_address.unwrap());
-                    let high = bus.read(effective_address.unwrap().add(1));
-                    cpu.regs.C = Accumulator::from(
-                        u16::from(cpu.regs.C) & (low as u16 | (high as u16) << 8),
-                    );
-                }
-                if u16::from(cpu.regs.C) >> 15 == 1 {
-                    cpu.regs.P.n = 1;
-                } else {
-                    cpu.regs.P.n = 0;
+                // TODO: This needs to become a function returning an enum having either a 8 or 16 bit value
+                match value.unwrap() {
+                    Operant_Value::short(val) => {
+                        cpu.regs.C = Accumulator::from((cpu.regs.C.A as u8 & val) as u16);
+                        if u16::from(cpu.regs.C) >> 8 == 1 {
+                            cpu.regs.P.n = 1;
+                        } else {
+                            cpu.regs.P.n = 0;
+                        }
+                    }
+                    Operant_Value::long(val) => {
+                        cpu.regs.C = Accumulator::from(u16::from(cpu.regs.C) & val as u16);
+                        if u16::from(cpu.regs.C) >> 15 == 1 {
+                            cpu.regs.P.n = 1;
+                        } else {
+                            cpu.regs.P.n = 0;
+                        }
+                    }
                 }
                 if u16::from(cpu.regs.C) == 0 {
                     cpu.regs.P.z = 1;
@@ -59,147 +135,171 @@ impl Instruction {
                 }
             }
             // TODO: test this
-            Opcodes::ADC => {
-                // TODO: Decimal flag
-                if cpu.e || cpu.regs.P.m == 1 {
-                    // 8-Bit
-                    if cpu.regs.C.A as u16 + (bus.read(effective_address.unwrap()) as u16) > 255
-                    {
-                        cpu.regs.P.v = 1;
-                    }
-                    let mut data =
-                        (cpu.regs.C.A as u8).wrapping_add(bus.read(effective_address.unwrap()));
-                    if cpu.regs.P.c == 0 {
-                        data += 1;
-                    }
-                    if data == 0 {
-                        cpu.regs.P.z = 1;
-                    } else {
-                        cpu.regs.P.z = 0;
-                    }
-                    if data >> 7 == 1 {
-                        cpu.regs.P.n = 1
-                    } else {
-                        cpu.regs.P.n = 0;
-                    }
-                    cpu.regs.C.A = data as u16;
-                } else {
-                    let mut data_low = bus.read(effective_address.unwrap());
-                    let mut data_high = bus.read(effective_address.unwrap().add(1));
-                    if cpu.regs.C.A as u16 + (data_low as u16) > 255 {
-                        // borrow required
-                        data_high += 1;
-                        cpu.regs.P.c = 0;
-                        cpu.regs.C.A = cpu.regs.C.A.wrapping_add(data_low.into());
-                        cpu.regs.C.B = cpu.regs.C.B.wrapping_add(data_high.into());
+            // Opcodes::ADC => {
+            //     match operant.unwrap() {
+            //         Operant_Value::short(value) => {
+            //             if cpu.regs.C.A as u16 + (value as u16) > 255 {
+            //                 cpu.regs.P.v = 1;
+            //             }
+            //             if cpu.regs.P.c == 0 {
+            //                 value += 1;
+            //             }
+            //             if value == 0 {
+            //                 cpu.regs.P.z = 1;
+            //             } else {
+            //                 cpu.regs.P.z = 0;
+            //             }
+            //             if value >> 7 == 1 {
+            //                 cpu.regs.P.n = 1
+            //             } else {
+            //                 cpu.regs.P.n = 0;
+            //             }
+            //             cpu.regs.C.A = value as u16;
+            //         }
+            //         Operant_Value::long(value) => {
+            //              if cpu.regs.C.A as u16 + (value as u16) > 255 {
+            //                 cpu.regs.P.v = 1;
+            //             }
+            //             if cpu.regs.P.c == 0 {
+            //                 value += 1;
+            //             }
+            //             if value == 0 {
+            //                 cpu.regs.P.z = 1;
+            //             } else {
+            //                 cpu.regs.P.z = 0;
+            //             }
+            //             if value >> 7 == 1 {
+            //                 cpu.regs.P.n = 1
+            //             } else {
+            //                 cpu.regs.P.n = 0;
+            //             }
+            //             cpu.regs.C.A = value as u16;
+            //         }
+            //     }
+            //     // TODO: Decimal flag
+            //     if cpu.e || cpu.regs.P.m == 1 {
+            //         // 8-Bit
 
-                        if u16::from(cpu.regs.C) == 0 {
-                            cpu.regs.P.z = 1;
-                        } else {
-                            cpu.regs.P.z = 0;
-                        }
-                        if u16::from(cpu.regs.C) >> 15 == 1 {
-                            cpu.regs.P.n = 1;
-                        } else {
-                            cpu.regs.P.n = 0;
-                        }
-                        cpu.regs.P.v = 1;
-                    } else {
-                        cpu.regs.P.c = 1;
-                        cpu.regs.C.A = cpu.regs.C.A.wrapping_add(data_low.into());
-                        cpu.regs.C.B = cpu.regs.C.B.wrapping_add(data_high.into());
+            //         let mut data =
+            //             (cpu.regs.C.A as u8).wrapping_add(bus.read(effective_address.unwrap()));
+            //     } else {
+            //         let mut data_low = bus.read(effective_address.unwrap());
+            //         let mut data_high = bus.read(effective_address.unwrap().add(1));
+            //         if cpu.regs.C.A as u16 + (data_low as u16) > 255 {
+            //             // borrow required
+            //             data_high += 1;
+            //             cpu.regs.P.c = 0;
+            //             cpu.regs.C.A = cpu.regs.C.A.wrapping_add(data_low.into());
+            //             cpu.regs.C.B = cpu.regs.C.B.wrapping_add(data_high.into());
 
-                        if u16::from(cpu.regs.C) == 0 {
-                            cpu.regs.P.z = 1;
-                        } else {
-                            cpu.regs.P.z = 0;
-                        }
-                        if u16::from(cpu.regs.C) >> 15 == 1 {
-                            cpu.regs.P.n = 1;
-                        } else {
-                            cpu.regs.P.n = 0;
-                        }
-                        cpu.regs.P.v = 0;
-                    }
-                }
-            }
-            Opcodes::ASL => {
-                if cpu.e || cpu.regs.P.m == 1 {
-                    let mut val;
-                    if self.address_mode == AddressModes::Accumulator {
-                        val = cpu.regs.C.A as u8;
-                    } else {
-                        // shift val located at effective_address
-                        val = bus.read(effective_address.unwrap());
-                    }
-                    val = val << 1;
-                    let msb = val >> 7;
-                    if msb == 1 {
-                        cpu.regs.P.n = 1;
-                    } else {
-                        cpu.regs.P.n = 0;
-                    }
-                    cpu.regs.P.c = msb;
-                    if self.address_mode == AddressModes::Accumulator {
-                        cpu.regs.C.A = val as u16
-                    } else {
-                        bus.write(effective_address.unwrap(), val);
-                    }
-                } else {
-                    let mut val;
-                    if self.address_mode == AddressModes::Accumulator {
-                        val = u16::from(cpu.regs.C);
-                    } else {
-                        // shift val located at effective_address
-                        val = bus.read(effective_address.unwrap()) as u16
-                            | ((bus.read(effective_address.unwrap().add(1)) as u16) << 8)
-                    }
-                    val = val << 1;
-                    let msb = val >> 15;
-                    if msb == 1 {
-                        cpu.regs.P.n = 1;
-                    } else {
-                        cpu.regs.P.n = 0;
-                    }
-                    cpu.regs.P.c = msb as u8;
-                    if self.address_mode == AddressModes::Accumulator {
-                        cpu.regs.C = Accumulator::from(val);
-                    } else {
-                        bus.write(effective_address.unwrap(), (val & 0x0f) as u8);
-                        bus.write(effective_address.unwrap().add(1), (val >> 8) as u8);
-                    }
-                }
-            }
+            //             if u16::from(cpu.regs.C) == 0 {
+            //                 cpu.regs.P.z = 1;
+            //             } else {
+            //                 cpu.regs.P.z = 0;
+            //             }
+            //             if u16::from(cpu.regs.C) >> 15 == 1 {
+            //                 cpu.regs.P.n = 1;
+            //             } else {
+            //                 cpu.regs.P.n = 0;
+            //             }
+            //             cpu.regs.P.v = 1;
+            //         } else {
+            //             cpu.regs.P.c = 1;
+            //             cpu.regs.C.A = cpu.regs.C.A.wrapping_add(data_low.into());
+            //             cpu.regs.C.B = cpu.regs.C.B.wrapping_add(data_high.into());
+
+            //             if u16::from(cpu.regs.C) == 0 {
+            //                 cpu.regs.P.z = 1;
+            //             } else {
+            //                 cpu.regs.P.z = 0;
+            //             }
+            //             if u16::from(cpu.regs.C) >> 15 == 1 {
+            //                 cpu.regs.P.n = 1;
+            //             } else {
+            //                 cpu.regs.P.n = 0;
+            //             }
+            //             cpu.regs.P.v = 0;
+            //         }
+            //     }
+            // }
+            // Opcodes::ASL => {
+            //     if cpu.e || cpu.regs.P.m == 1 {
+            //         let mut val;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             val = cpu.regs.C.A as u8;
+            //         } else {
+            //             // shift val located at effective_address
+            //             val = bus.read(effective_address.unwrap());
+            //         }
+            //         val = val << 1;
+            //         let msb = val >> 7;
+            //         if msb == 1 {
+            //             cpu.regs.P.n = 1;
+            //         } else {
+            //             cpu.regs.P.n = 0;
+            //         }
+            //         cpu.regs.P.c = msb;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             cpu.regs.C.A = val as u16
+            //         } else {
+            //             bus.write(effective_address.unwrap(), val);
+            //         }
+            //     } else {
+            //         let mut val;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             val = u16::from(cpu.regs.C);
+            //         } else {
+            //             // shift val located at effective_address
+            //             val = bus.read(effective_address.unwrap()) as u16
+            //                 | ((bus.read(effective_address.unwrap().add(1)) as u16) << 8)
+            //         }
+            //         val = val << 1;
+            //         let msb = val >> 15;
+            //         if msb == 1 {
+            //             cpu.regs.P.n = 1;
+            //         } else {
+            //             cpu.regs.P.n = 0;
+            //         }
+            //         cpu.regs.P.c = msb as u8;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             cpu.regs.C = Accumulator::from(val);
+            //         } else {
+            //             bus.write(effective_address.unwrap(), (val & 0x0f) as u8);
+            //             bus.write(effective_address.unwrap().add(1), (val >> 8) as u8);
+            //         }
+            //     }
+            // }
             Opcodes::BIT => {
-                if cpu.e || cpu.regs.P.m == 0 {
-                    if self.address_mode == AddressModes::Immediate {
-                        if self.payload[0] == 0 {
-                            cpu.regs.P.z = 1;
-                        } else {
-                            cpu.regs.P.z = 0;
-                        }
-                    } else {
-                        let mut val = bus.read(effective_address.unwrap());
-                        cpu.regs.P.n = (val >> 7) & 0x1;
-                        cpu.regs.P.v = (val >> 6) & 0x1;
-                        val = val & (cpu.regs.C.A as u8);
-                        cpu.regs.P.z = !val;
-                    }
+                if !is_16_bit_mem_and_accu(cpu) {
+                    // if cpu.e || cpu.regs.P.m == 0 {
+                    // if self.address_mode == AddressModes::Immediate {
+                    //     if self.payload[0] == 0 {
+                    //         cpu.regs.P.z = 1;
+                    //     } else {
+                    //         cpu.regs.P.z = 0;
+                    //     }
+                    // } else {
+                    // let mut val = bus.read(effective_address.unwrap());
+                    let mut val = value.unwrap().lower_to_number() as u8;
+                    cpu.regs.P.n = (val >> 7) & 0x1;
+                    cpu.regs.P.v = (val >> 6) & 0x1;
+                    val = val & (cpu.regs.C.A as u8);
+                    cpu.regs.P.z = !val;
+                    // }
                 } else {
-                    if self.address_mode == AddressModes::Immediate {
-                        if self.payload[0] as u16 | (self.payload[1] as u16) << 8 == 0 {
-                            cpu.regs.P.z = 1;
-                        } else {
-                            cpu.regs.P.z = 0;
-                        }
-                    } else {
-                        let mut val = bus.read(effective_address.unwrap()) as u16
-                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
-                        cpu.regs.P.n = ((val >> 15) & 0x1) as u8;
-                        cpu.regs.P.v = ((val >> 14) & 0x1) as u8;
-                        val = val & u16::from(cpu.regs.C);
-                        cpu.regs.P.z = !(val as u8);
-                    }
+                    // if self.address_mode == AddressModes::Immediate {
+                    //     if self.payload[0] as u16 | (self.payload[1] as u16) << 8 == 0 {
+                    //         cpu.regs.P.z = 1;
+                    //     } else {
+                    //         cpu.regs.P.z = 0;
+                    //     }
+                    // } else {
+                    let mut val = value.unwrap().lower_to_number() as u16;
+                    cpu.regs.P.n = ((val >> 15) & 0x1) as u8;
+                    cpu.regs.P.v = ((val >> 14) & 0x1) as u8;
+                    val = val & u16::from(cpu.regs.C);
+                    cpu.regs.P.z = !(val as u8);
+                    // }
                 }
             }
             Opcodes::BRA => {
@@ -256,30 +356,43 @@ impl Instruction {
             }
             Opcodes::CLD => cpu.regs.P.d = 0,
             Opcodes::CMP => {
-                let val;
-                if cpu.e || cpu.regs.P.m == 1 {
-                    val = u16::from(cpu.regs.C) - bus.read(effective_address.unwrap()) as u16;
+                // let val;
+                if !is_16_bit_mem_and_accu(cpu) {
+                    let mut val = value.unwrap().lower_to_number() as u8;
+                    let res = (u16::from(cpu.regs.C.A) as u8) - val;
+                    if res >> 7 == 1 {
+                        cpu.regs.P.n = 1;
+                    } else {
+                        cpu.regs.P.n = 0;
+                    }
+                    if res == 0 {
+                        cpu.regs.P.z = 1;
+                    } else {
+                        cpu.regs.P.z = 0;
+                    }
+                    if u16::from(cpu.regs.C.A) as u8 >= val {
+                        cpu.regs.P.c = 1;
+                    } else {
+                        cpu.regs.P.c = 0;
+                    }
                 } else {
-                    val = u16::from(cpu.regs.C)
-                        - (bus.read(effective_address.unwrap()) as u16
-                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8);
-                }
-                let res = u16::from(cpu.regs.C) - val;
-
-                if res >> 15 == 1 {
-                    cpu.regs.P.n = 1;
-                } else {
-                    cpu.regs.P.n = 0;
-                }
-                if res == 0 {
-                    cpu.regs.P.z = 1;
-                } else {
-                    cpu.regs.P.z = 0;
-                }
-                if u16::from(cpu.regs.C) >= val {
-                    cpu.regs.P.c = 1;
-                } else {
-                    cpu.regs.P.c = 0;
+                    let mut val = value.unwrap().lower_to_number();
+                    let res = u16::from(cpu.regs.C) - val as u16;
+                    if res >> 15 == 1 {
+                        cpu.regs.P.n = 1;
+                    } else {
+                        cpu.regs.P.n = 0;
+                    }
+                    if res == 0 {
+                        cpu.regs.P.z = 1;
+                    } else {
+                        cpu.regs.P.z = 0;
+                    }
+                    if u16::from(cpu.regs.C) >= val as u16 {
+                        cpu.regs.P.c = 1;
+                    } else {
+                        cpu.regs.P.c = 0;
+                    }
                 }
             }
             Opcodes::SEI => {
@@ -290,13 +403,14 @@ impl Instruction {
             }
             Opcodes::CPX => {
                 // 8 Bit registers
-                if cpu.e || cpu.regs.P.x == 1 {
+                if !is_16_bit_index(cpu) {
+                    // if cpu.e || cpu.regs.P.x == 1 {
                     let val;
-                    if self.address_mode != AddressModes::Immediate {
-                        val = bus.read(effective_address.unwrap());
-                    } else {
-                        val = self.payload[0];
-                    }
+                    // if self.address_mode != AddressModes::Immediate {
+                    val = value.unwrap().lower_to_number() as u8;
+                    // } else {
+                    //     val = self.payload[0];
+                    // }
                     let bar = (cpu.regs.X.low as u8).wrapping_sub(val);
                     if bar >> 7 == 1 {
                         cpu.regs.P.n = 1;
@@ -316,13 +430,13 @@ impl Instruction {
                     }
                 } else {
                     let val;
-                    if self.address_mode != AddressModes::Immediate {
-                        val = bus.read(effective_address.unwrap()) as u16
-                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
-                    } else {
-                        val = self.payload[0] as u16 | ((self.payload[1] as u16) << 8);
-                    }
-                    let bar = <u16>::from(cpu.regs.X).wrapping_sub(val);
+                    // if self.address_mode != AddressModes::Immediate {
+                    //     val = bus.read(effective_address.unwrap()) as u16
+                    //         | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
+                    // } else {
+                    val = value.unwrap().lower_to_number();
+                    // }
+                    let bar = <u16>::from(cpu.regs.X).wrapping_sub(val as u16);
                     if bar >> 15 == 1 {
                         cpu.regs.P.n = 1;
                     } else {
@@ -368,17 +482,17 @@ impl Instruction {
                     }
                 }
             }
-            Opcodes::EOR => {
-                if cpu.e || cpu.regs.P.m == 1 {
-                    let val = bus.read(effective_address.unwrap());
-                    cpu.regs.C =
-                        Accumulator::from(cpu.regs.C.B | (cpu.regs.C.A as u8 ^ val) as u16);
-                } else {
-                    let val = bus.read(effective_address.unwrap()) as u16
-                        | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
-                    cpu.regs.C = Accumulator::from(u16::from(cpu.regs.C) ^ val);
-                }
-            }
+            // Opcodes::EOR => {
+            //     if cpu.e || cpu.regs.P.m == 1 {
+            //         let val = bus.read(effective_address.unwrap());
+            //         cpu.regs.C =
+            //             Accumulator::from(cpu.regs.C.B | (cpu.regs.C.A as u8 ^ val) as u16);
+            //     } else {
+            //         let val = bus.read(effective_address.unwrap()) as u16
+            //             | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
+            //         cpu.regs.C = Accumulator::from(u16::from(cpu.regs.C) ^ val);
+            //     }
+            // }
             Opcodes::XCE => {
                 // Exchange carry with phantom emulation flag
                 // TODO: Reset programm bank register
@@ -408,15 +522,18 @@ impl Instruction {
             Opcodes::LDX => {
                 if cpu.regs.P.x != 1 {
                     let mut val = 0;
-                    if self.address_mode == AddressModes::Immediate {
-                        val = effective_address.unwrap().address;
-                    } else {
-                        val = bus
-                            .cartridge
-                            .as_ref()
-                            .unwrap()
-                            .read_u16(effective_address.unwrap().address as usize);
+                    // if self.address_mode == AddressModes::Immediate {
+                    //     val = effective_address.unwrap().address;
+                    // } else {
+                    match value.unwrap() {
+                        Operant_Value::short(v) => {
+                            val = v as i32;
+                        }
+                        Operant_Value::long(v) => {
+                            val = v as i32;
+                        }
                     }
+                    // }
 
                     // Set cpu flags accordingly
                     if val == 0 {
@@ -425,53 +542,41 @@ impl Instruction {
                         cpu.regs.P.z = 0;
                     }
 
-                    if (val >> 7) == 1 {
-                        cpu.regs.P.n = 1;
+                    if is_16_bit_mem_and_accu(cpu) {
+                        if (val >> 15) == 1 {
+                            cpu.regs.P.n = 1;
+                        } else {
+                            cpu.regs.P.n = 0;
+                        }
                     } else {
-                        cpu.regs.P.n = 0;
+                        if (val >> 7) == 1 {
+                            cpu.regs.P.n = 1;
+                        } else {
+                            cpu.regs.P.n = 0;
+                        }
                     }
-
-                    cpu.regs.X = IndexRegister::from(val);
-                } else {
-                    let load_address = self.payload[0];
-
-                    let val;
-                    if self.address_mode == AddressModes::Immediate {
-                        val = load_address;
+                    if is_16_bit_index(cpu) {
+                        cpu.regs.X = IndexRegister::from(val as u16);
                     } else {
-                        val = bus
-                            .cartridge
-                            .as_ref()
-                            .unwrap()
-                            .read_byte(load_address.try_into().unwrap());
+                        cpu.regs.X = IndexRegister::from(val as u8);
                     }
-                    // Set cpu flags accordingly
-                    if val == 0 {
-                        cpu.regs.P.z = 1;
-                    } else {
-                        cpu.regs.P.z = 0;
-                    }
-
-                    if (val >> 7) == 1 {
-                        cpu.regs.P.n = 1;
-                    } else {
-                        cpu.regs.P.n = 0;
-                    }
-                    cpu.regs.X = IndexRegister::from(val);
                 }
             }
             Opcodes::LDY => {
                 if cpu.regs.P.x != 1 {
                     let mut val = 0;
-                    if self.address_mode == AddressModes::Immediate {
-                        val = effective_address.unwrap().address;
-                    } else {
-                        val = bus
-                            .cartridge
-                            .as_ref()
-                            .unwrap()
-                            .read_u16(effective_address.unwrap().address as usize);
+                    // if self.address_mode == AddressModes::Immediate {
+                    //     val = effective_address.unwrap().address;
+                    // } else {
+                    match value.unwrap() {
+                        Operant_Value::short(v) => {
+                            val = v as i32;
+                        }
+                        Operant_Value::long(v) => {
+                            val = v as i32;
+                        }
                     }
+                    // }
 
                     // Set cpu flags accordingly
                     if val == 0 {
@@ -480,40 +585,29 @@ impl Instruction {
                         cpu.regs.P.z = 0;
                     }
 
-                    if (val >> 7) == 1 {
-                        cpu.regs.P.n = 1;
+                    if is_16_bit_mem_and_accu(cpu) {
+                        if (val >> 15) == 1 {
+                            cpu.regs.P.n = 1;
+                        } else {
+                            cpu.regs.P.n = 0;
+                        }
                     } else {
-                        cpu.regs.P.n = 0;
+                        if (val >> 7) == 1 {
+                            cpu.regs.P.n = 1;
+                        } else {
+                            cpu.regs.P.n = 0;
+                        }
                     }
-
-                    cpu.regs.Y = IndexRegister::from(val);
-                } else {
-                    let load_address = self.payload[0];
-
-                    let val;
-                    if self.address_mode == AddressModes::Immediate {
-                        val = load_address;
+                    if is_16_bit_index(cpu) {
+                        cpu.regs.Y = IndexRegister::from(val as u16);
                     } else {
-                        val = bus
-                            .cartridge
-                            .as_ref()
-                            .unwrap()
-                            .read_byte(load_address.try_into().unwrap());
+                        cpu.regs.Y = IndexRegister::from(val as u8);
                     }
-                    // Set cpu flags accordingly
-                    if val == 0 {
-                        cpu.regs.P.z = 1;
-                    } else {
-                        cpu.regs.P.z = 0;
-                    }
-
-                    if (val >> 7) == 1 {
-                        cpu.regs.P.n = 1;
-                    } else {
-                        cpu.regs.P.n = 0;
-                    }
-                    cpu.regs.Y = IndexRegister::from(val);
                 }
+            }
+            Opcodes::NOP => {
+                // No need to increment.. this is done by the iterator
+                // cpu.get_regs().PC += 1;
             }
             Opcodes::TXS => {
                 if cpu.e {
@@ -580,23 +674,34 @@ impl Instruction {
                 }
             }
             Opcodes::JMP => {
-                // TODO: At long jumping: Bank Mapping e.g. in HiRom is bank 80 - 9f  = 00 - 1f etc
-                //  also do this in AddressMode module
-                // TODO: Use Memmaper to handle program/databank register update and returning 16 Bit pc
                 if follow_jumps {
                     cpu.regs.PC = effective_address.unwrap().address;
+                    if self.address_mode == AddressModes::AbsoluteLong {
+                        cpu.regs.PBR = effective_address.unwrap().bank;
+                    }
+                    // cpu.
+                    // | (cpu.regs.DBR as u16) << 16;
+                    // cpu.regs.PC = value.unwrap().lower_to_number() as u16;
                 }
             }
             Opcodes::JSR => {
                 if follow_jumps {
                     let pc_low = (cpu.regs.PC & 0x00ff) as u8;
                     let pc_high = (cpu.regs.PC >> 8) as u8;
+                    if self.address_mode == AddressModes::AbsoluteLong {
+                        let bank = cpu.regs.PBR;
+                        cpu.stack_push(bank);
+                    }
 
                     cpu.stack_push(pc_high);
                     cpu.stack_push(pc_low);
 
-                    // let address = effective_address;
+                    // let address = effective_address
+                    if self.address_mode == AddressModes::AbsoluteLong {
+                        cpu.regs.PBR = effective_address.unwrap().bank;
+                    }
                     cpu.regs.PC = effective_address.unwrap().address;
+                    // cpu.regs.PC = value.unwrap().lower_to_number() as u16;
                 }
             }
             // TODO:
@@ -615,43 +720,43 @@ impl Instruction {
                     cpu.regs.PBR = bank;
                 }
             }
-            Opcodes::ROL => {
-                if cpu.e || cpu.regs.P.m == 1 {
-                    let mut val;
-                    if self.address_mode == AddressModes::Accumulator {
-                        val = cpu.regs.C.A as u8
-                    } else {
-                        val = bus.read(effective_address.unwrap());
-                    }
-                    let new_c = val >> 7;
-                    let old_c = cpu.regs.P.c;
-                    val = (val << 1) | old_c;
-                    cpu.regs.P.c = new_c;
-                    if self.address_mode == AddressModes::Accumulator {
-                        cpu.regs.C.A = val as u16;
-                    } else {
-                        bus.write(effective_address.unwrap(), val);
-                    }
-                } else {
-                    let mut val;
-                    if self.address_mode == AddressModes::Accumulator {
-                        val = u16::from(cpu.regs.C);
-                    } else {
-                        val = bus.read(effective_address.unwrap()) as u16
-                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
-                    }
-                    let new_c = val >> 15;
-                    let old_c = cpu.regs.P.c as u16;
-                    val = (val << 1) | old_c;
-                    cpu.regs.P.c = new_c as u8;
-                    if self.address_mode == AddressModes::Accumulator {
-                        cpu.regs.C = Accumulator::from(val);
-                    } else {
-                        bus.write(effective_address.unwrap(), (val & 0xf) as u8);
-                        bus.write(effective_address.unwrap().add(1), (val >> 8) as u8);
-                    }
-                }
-            }
+            // Opcodes::ROL => {
+            //     if cpu.e || cpu.regs.P.m == 1 {
+            //         let mut val;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             val = cpu.regs.C.A as u8
+            //         } else {
+            //             val = bus.read(effective_address.unwrap());
+            //         }
+            //         let new_c = val >> 7;
+            //         let old_c = cpu.regs.P.c;
+            //         val = (val << 1) | old_c;
+            //         cpu.regs.P.c = new_c;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             cpu.regs.C.A = val as u16;
+            //         } else {
+            //             bus.write(effective_address.unwrap(), val);
+            //         }
+            //     } else {
+            //         let mut val;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             val = u16::from(cpu.regs.C);
+            //         } else {
+            //             val = bus.read(effective_address.unwrap()) as u16
+            //                 | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
+            //         }
+            //         let new_c = val >> 15;
+            //         let old_c = cpu.regs.P.c as u16;
+            //         val = (val << 1) | old_c;
+            //         cpu.regs.P.c = new_c as u8;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             cpu.regs.C = Accumulator::from(val);
+            //         } else {
+            //             bus.write(effective_address.unwrap(), (val & 0xf) as u8);
+            //             bus.write(effective_address.unwrap().add(1), (val >> 8) as u8);
+            //         }
+            //     }
+            // }
             Opcodes::RTS => {
                 let op_low = cpu.stack_pull();
                 let op_high = cpu.stack_pull();
@@ -664,61 +769,83 @@ impl Instruction {
                 cpu.regs.PC = ((op_high as u16) << 8) | op_low as u16;
                 cpu.regs.PBR = pbr;
             }
+
             Opcodes::LDA => {
-                if cpu.e || cpu.regs.P.m == 1 {
-                    let val;
-                    if self.address_mode == AddressModes::Immediate {
+                // if !is_16_bit_mem_and_accu(cpu) {
+                let val;
+                let msb;
+                if self.address_mode == AddressModes::Immediate {
+                    if is_16_bit_mem_and_accu(cpu) {
+                        val = self.payload[0] as u16 | (self.payload[1] as u16) << 8;
+                        msb = val >> 15;
+                        cpu.regs.C = Accumulator::from(val);
+                    } else {
                         val = self.payload[0] as u16;
-                    } else {
-                        val = bus.read(effective_address.unwrap()) as u16;
-                    }
-                    cpu.regs.C.A = val;
-                } else {
-                    let val;
-                    if self.address_mode == AddressModes::Immediate {
-                        val = (self.payload[1] as u16) << 8 | self.payload[0] as u16;
-                    } else {
-                        val = bus.read(effective_address.unwrap()) as u16
-                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
-                    }
-                    cpu.regs.C = Accumulator::from(val);
-                }
-            }
-            Opcodes::LSR => {
-                if cpu.e || cpu.regs.P.m == 1 {
-                    let mut val;
-                    if self.address_mode == AddressModes::Accumulator {
-                        val = u16::from(cpu.regs.C) as u8;
-                    } else {
-                        val = bus.read(effective_address.unwrap());
-                    }
-                    // set carry bit
-                    cpu.regs.P.c = val & 0x1;
-                    cpu.regs.C = Accumulator::from((val >> 1) as u16);
-                    if val == 0 {
-                        cpu.regs.P.z = 1;
-                    } else {
-                        cpu.regs.P.z = 0;
+                        msb = val >> 7;
+                        cpu.regs.C.A = val;
                     }
                 } else {
-                    let mut val;
-                    if self.address_mode == AddressModes::Accumulator {
-                        val = u16::from(cpu.regs.C);
-                    } else {
-                        val = bus.read(effective_address.unwrap()) as u16
-                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
-                    }
-                    // set carry bit
-                    cpu.regs.P.c = val as u8 & 1;
-                    cpu.regs.C = Accumulator::from((val >> 1) as u16);
-                    if val == 0 {
-                        cpu.regs.P.z = 1;
-                    } else {
-                        cpu.regs.P.z = 0;
+                    match value.unwrap() {
+                        Operant_Value::long(v) => {
+                            val = v as u16;
+                            msb = (v as u16) >> 15;
+                            cpu.regs.C = Accumulator::from(v as u16)
+                        }
+                        Operant_Value::short(v) => {
+                            msb = (v >> 7) as u16;
+                            val = v as u16;
+                            cpu.regs.C.A = v.into();
+                        }
                     }
                 }
-                cpu.regs.P.n = 0;
+
+                if val == 0 {
+                    cpu.get_regs().P.z = 1;
+                } else {
+                    cpu.get_regs().P.z = 0;
+                }
+                if msb == 1 {
+                    cpu.get_regs().P.n = 1;
+                } else {
+                    cpu.get_regs().P.n = 0;
+                }
+                // }
             }
+            // Opcodes::LSR => {
+            //     if cpu.e || cpu.regs.P.m == 1 {
+            //         let mut val;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             val = u16::from(cpu.regs.C) as u8;
+            //         } else {
+            //             val = bus.read(effective_address.unwrap());
+            //         }
+            //         // set carry bit
+            //         cpu.regs.P.c = val & 0x1;
+            //         cpu.regs.C = Accumulator::from((val >> 1) as u16);
+            //         if val == 0 {
+            //             cpu.regs.P.z = 1;
+            //         } else {
+            //             cpu.regs.P.z = 0;
+            //         }
+            //     } else {
+            //         let mut val;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             val = u16::from(cpu.regs.C);
+            //         } else {
+            //             val = bus.read(effective_address.unwrap()) as u16
+            //                 | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
+            //         }
+            //         // set carry bit
+            //         cpu.regs.P.c = val as u8 & 1;
+            //         cpu.regs.C = Accumulator::from((val >> 1) as u16);
+            //         if val == 0 {
+            //             cpu.regs.P.z = 1;
+            //         } else {
+            //             cpu.regs.P.z = 0;
+            //         }
+            //     }
+            //     cpu.regs.P.n = 0;
+            // }
             // TODO: TEST this!
             Opcodes::SBC => {
                 // TODO: Decimal flag
@@ -785,9 +912,7 @@ impl Instruction {
             }
             Opcodes::STA => {
                 // println!("STA ====>{:?}", self.payload);
-                if cpu.e || cpu.regs.P.m == 1
-                /*&& cpu.e*/
-                {
+                if is_16_bit_mem_and_accu(cpu) {
                     bus.write(effective_address.unwrap(), cpu.regs.C.A as u8);
                 } else {
                     bus.write(effective_address.unwrap(), cpu.regs.C.A as u8);
@@ -797,9 +922,11 @@ impl Instruction {
             }
             Opcodes::STZ => {
                 bus.write(effective_address.unwrap(), 0x0);
+                // reset zero flag
+                cpu.get_regs().P.z = 0;
             }
             Opcodes::STX => {
-                if cpu.e || cpu.regs.P.m == 1 {
+                if is_16_bit_index(cpu) {
                     bus.write(effective_address.unwrap(), cpu.regs.X.low as u8);
                 } else {
                     bus.write(effective_address.unwrap(), cpu.regs.X.low as u8);
@@ -807,7 +934,7 @@ impl Instruction {
                 }
             }
             Opcodes::STY => {
-                if cpu.e || cpu.regs.P.m == 1 {
+                if is_16_bit_index(cpu) {
                     bus.write(effective_address.unwrap(), cpu.regs.Y.low as u8);
                 } else {
                     bus.write(effective_address.unwrap(), cpu.regs.Y.low as u8);
@@ -896,139 +1023,189 @@ impl Instruction {
                     cpu.regs.P.z = 0;
                 }
             }
-            Opcodes::DEC => {
-                if cpu.e || cpu.regs.P.m == 1 {
-                    let mut val;
-                    if self.address_mode == AddressModes::Accumulator {
-                        val = cpu.regs.C.A as u8;
-                    } else {
-                        val = bus.read(effective_address.unwrap()) as u8;
-                    }
-                    val = val.wrapping_sub(1);
-                    if val >> 7 == 1 {
-                        cpu.regs.P.n = 1;
-                    } else {
-                        cpu.regs.P.n = 0;
-                    }
-                    if val == 0 {
-                        cpu.regs.P.z = 1;
-                    } else {
-                        cpu.regs.P.z = 0;
-                    }
-                    if self.address_mode == AddressModes::Accumulator {
-                        cpu.regs.C.A = val as u16;
-                    } else {
-                        bus.write(effective_address.unwrap(), val);
-                    }
-                } else {
-                    // TODO
-                    let mut val;
-                    if self.address_mode == AddressModes::Accumulator {
-                        val = cpu.regs.C.A as u8;
-                    } else {
-                        val = bus.read(effective_address.unwrap()) as u8;
-                    }
-                    val -= 1;
-                    if val >> 7 == 1 {
-                        cpu.regs.P.n = 1;
-                    } else {
-                        cpu.regs.P.n = 0;
-                    }
-                    if val == 0 {
-                        cpu.regs.P.z = 1;
-                    } else {
-                        cpu.regs.P.z = 0;
-                    }
-                    if self.address_mode == AddressModes::Accumulator {
-                        cpu.regs.C.A = val as u16;
-                    } else {
-                        bus.write(effective_address.unwrap(), val);
-                    }
-                }
-            }
+            // Opcodes::DEC => {
+            //     if cpu.e || cpu.regs.P.m == 1 {
+            //         let mut val;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             val = cpu.regs.C.A as u8;
+            //         } else {
+            //             val = bus.read(effective_address.unwrap()) as u8;
+            //         }
+            //         val = val.wrapping_sub(1);
+            //         if val >> 7 == 1 {
+            //             cpu.regs.P.n = 1;
+            //         } else {
+            //             cpu.regs.P.n = 0;
+            //         }
+            //         if val == 0 {
+            //             cpu.regs.P.z = 1;
+            //         } else {
+            //             cpu.regs.P.z = 0;
+            //         }
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             cpu.regs.C.A = val as u16;
+            //         } else {
+            //             bus.write(effective_address.unwrap(), val);
+            //         }
+            //     } else {
+            //         // TODO
+            //         let mut val;
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             val = cpu.regs.C.A as u8;
+            //         } else {
+            //             val = bus.read(effective_address.unwrap()) as u8;
+            //         }
+            //         val -= 1;
+            //         if val >> 7 == 1 {
+            //             cpu.regs.P.n = 1;
+            //         } else {
+            //             cpu.regs.P.n = 0;
+            //         }
+            //         if val == 0 {
+            //             cpu.regs.P.z = 1;
+            //         } else {
+            //             cpu.regs.P.z = 0;
+            //         }
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             cpu.regs.C.A = val as u16;
+            //         } else {
+            //             bus.write(effective_address.unwrap(), val);
+            //         }
+            //     }
+            // }
+            // TODO: SET STATUS FLAGS!!!!
             Opcodes::DEX => {
                 let index: u16 = u16::from(cpu.regs.X).wrapping_sub(1);
                 cpu.regs.X = IndexRegister::from(index);
+                if u16::from(cpu.get_regs().X) == 0 {
+                    cpu.get_regs().P.z = 1;
+                }
+                if is_16_bit_index(cpu) {
+                    if u16::from(cpu.get_regs().X.get_low()) >> 7 == 1 {
+                        cpu.get_regs().P.z = 1;
+                    }
+                } else {
+                    if u16::from(cpu.get_regs().X) >> 15 == 1 {
+                        cpu.get_regs().P.z = 1;
+                    }
+                }
             }
             Opcodes::DEY => {
                 let index: u16 = u16::from(cpu.regs.Y).wrapping_sub(1);
                 cpu.regs.Y = IndexRegister::from(index);
+                if u16::from(cpu.get_regs().Y) == 0 {
+                    cpu.get_regs().P.z = 1;
+                }
+                if is_16_bit_index(cpu) {
+                    if u16::from(cpu.get_regs().Y.get_low()) >> 7 == 1 {
+                        cpu.get_regs().P.z = 1;
+                    }
+                } else {
+                    if u16::from(cpu.get_regs().Y) >> 15 == 1 {
+                        cpu.get_regs().P.z = 1;
+                    }
+                }
             }
             Opcodes::INX => {
                 let index: u16 = u16::from(cpu.regs.X).wrapping_add(1);
                 cpu.regs.X = IndexRegister::from(index);
+                if u16::from(cpu.get_regs().X) == 0 {
+                    cpu.get_regs().P.z = 1;
+                }
+                if is_16_bit_index(cpu) {
+                    if u16::from(cpu.get_regs().X.get_low()) >> 7 == 1 {
+                        cpu.get_regs().P.z = 1;
+                    }
+                } else {
+                    if u16::from(cpu.get_regs().X) >> 15 == 1 {
+                        cpu.get_regs().P.z = 1;
+                    }
+                }
             }
             Opcodes::INY => {
                 let index: u16 = u16::from(cpu.regs.Y).wrapping_add(1);
                 cpu.regs.Y = IndexRegister::from(index);
-            }
-            Opcodes::INC => {
-                if cpu.e || cpu.regs.P.m == 1 {
-                    if self.address_mode == AddressModes::Accumulator {
-                        cpu.regs.C.A += 1;
-                        if u16::from(cpu.regs.C.A as u8) == 0 {
-                            cpu.regs.P.z = 1;
-                        } else {
-                            cpu.regs.P.z = 0;
-                        }
-                        if u16::from(cpu.regs.C.A as u8) >> 7 == 1 {
-                            cpu.regs.P.n = 1;
-                        } else {
-                            cpu.regs.P.n = 0;
-                        }
-                    } else {
-                        // TODO: Wrapping?
-                        let val = bus.read(effective_address.unwrap()) + 1;
-                        bus.write(effective_address.unwrap(), val);
-                        if val == 0 {
-                            cpu.regs.P.z = 1;
-                        } else {
-                            cpu.regs.P.z = 0;
-                        }
-                        if val >> 7 == 1 {
-                            cpu.regs.P.n = 1;
-                        } else {
-                            cpu.regs.P.n = 0;
-                        }
+                if u16::from(cpu.get_regs().Y) == 0 {
+                    cpu.get_regs().P.z = 1;
+                }
+                if is_16_bit_index(cpu) {
+                    if u16::from(cpu.get_regs().X.get_low()) >> 7 == 1 {
+                        cpu.get_regs().P.z = 1;
                     }
                 } else {
-                    if self.address_mode == AddressModes::Accumulator {
-                        cpu.regs.C = Accumulator::from(u16::from(cpu.regs.C) + 1);
-                        if u16::from(cpu.regs.C) == 0 {
-                            cpu.regs.P.z = 1;
-                        } else {
-                            cpu.regs.P.z = 0;
-                        }
-                        if u16::from(cpu.regs.C) >> 15 == 1 {
-                            cpu.regs.P.n = 1;
-                        } else {
-                            cpu.regs.P.n = 0;
-                        }
-                    } else {
-                        // TODO: Wrapping?
-                        let val_low = bus.read(effective_address.unwrap());
-                        let val_high = bus.read(effective_address.unwrap().add(1));
-                        bus.write(effective_address.unwrap(), val_low);
-                        bus.write(effective_address.unwrap().add(1), val_high);
-
-                        if val_low as u16 | (val_high as u16) << 8 == 0 {
-                            cpu.regs.P.z = 1;
-                        } else {
-                            cpu.regs.P.z = 0;
-                        }
-                        if val_low as u16 | (val_high as u16) >> 15 == 1 {
-                            cpu.regs.P.n = 1;
-                        } else {
-                            cpu.regs.P.n = 0;
-                        }
+                    if u16::from(cpu.get_regs().X) >> 15 == 1 {
+                        cpu.get_regs().P.z = 1;
                     }
                 }
             }
+            // Opcodes::INC => {
+            //     if cpu.e || cpu.regs.P.m == 1 {
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             cpu.regs.C.A += 1;
+            //             if u16::from(cpu.regs.C.A as u8) == 0 {
+            //                 cpu.regs.P.z = 1;
+            //             } else {
+            //                 cpu.regs.P.z = 0;
+            //             }
+            //             if u16::from(cpu.regs.C.A as u8) >> 7 == 1 {
+            //                 cpu.regs.P.n = 1;
+            //             } else {
+            //                 cpu.regs.P.n = 0;
+            //             }
+            //         } else {
+            //             // TODO: Wrapping?
+            //             let val = bus.read(effective_address.unwrap()) + 1;
+            //             bus.write(effective_address.unwrap(), val);
+            //             if val == 0 {
+            //                 cpu.regs.P.z = 1;
+            //             } else {
+            //                 cpu.regs.P.z = 0;
+            //             }
+            //             if val >> 7 == 1 {
+            //                 cpu.regs.P.n = 1;
+            //             } else {
+            //                 cpu.regs.P.n = 0;
+            //             }
+            //         }
+            //     } else {
+            //         if self.address_mode == AddressModes::Accumulator {
+            //             cpu.regs.C = Accumulator::from(u16::from(cpu.regs.C) + 1);
+            //             if u16::from(cpu.regs.C) == 0 {
+            //                 cpu.regs.P.z = 1;
+            //             } else {
+            //                 cpu.regs.P.z = 0;
+            //             }
+            //             if u16::from(cpu.regs.C) >> 15 == 1 {
+            //                 cpu.regs.P.n = 1;
+            //             } else {
+            //                 cpu.regs.P.n = 0;
+            //             }
+            //         } else {
+            //             // TODO: Wrapping?
+            //             let val_low = bus.read(effective_address.unwrap());
+            //             let val_high = bus.read(effective_address.unwrap().add(1));
+            //             bus.write(effective_address.unwrap(), val_low);
+            //             bus.write(effective_address.unwrap().add(1), val_high);
+
+            //             if val_low as u16 | (val_high as u16) << 8 == 0 {
+            //                 cpu.regs.P.z = 1;
+            //             } else {
+            //                 cpu.regs.P.z = 0;
+            //             }
+            //             if val_low as u16 | (val_high as u16) >> 15 == 1 {
+            //                 cpu.regs.P.n = 1;
+            //             } else {
+            //                 cpu.regs.P.n = 0;
+            //             }
+            //         }
+            //     }
+            // }
             Opcodes::BNE => {
                 if cpu.regs.P.z == 1 {
                     return;
                 } else {
-                    cpu.regs.PC = effective_address.unwrap().address as _;
+                    // cpu.regs.PC = effective_address.unwrap().address as _;
+                    cpu.regs.PC = (cpu.regs.PC as i16 + (self.payload[0] as i8) as i16) as u16;
                 }
             }
             Opcodes::PLD => {
@@ -1176,48 +1353,48 @@ impl Instruction {
                 cpu.regs.C.B = cpu.regs.C.A;
                 cpu.regs.C.A = temp;
             }
-            Opcodes::ORA => {
-                if cpu.e || cpu.regs.P.m == 1 {
-                    let val;
-                    if self.address_mode == AddressModes::Immediate {
-                        val = self.payload[0];
-                    } else {
-                        val = bus.read(effective_address.unwrap());
-                    }
-                    cpu.regs.C.A = cpu.regs.C.A | val as u16;
-                    if u16::from(cpu.regs.C.A) as u8 >> 7 == 1 {
-                        cpu.regs.P.n = 1;
-                    } else {
-                        cpu.regs.P.n = 0;
-                    }
-                    if cpu.regs.C.A == 0 {
-                        cpu.regs.P.z = 1;
-                    } else {
-                        cpu.regs.P.z = 0;
-                    }
-                } else {
-                    // 16 bit
-                    let val;
-                    if self.address_mode == AddressModes::Immediate {
-                        val = self.payload[0] as u16 | (self.payload[1] as u16) << 8;
-                    } else {
-                        val = bus.read(effective_address.unwrap()) as u16
-                            | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
-                    }
-                    cpu.regs.C = Accumulator::from(u16::from(cpu.regs.C) | val as u16);
-                    if u16::from(cpu.regs.C) >> 15 == 1 {
-                        cpu.regs.P.n = 1;
-                    } else {
-                        cpu.regs.P.n = 0;
-                    }
+            // Opcodes::ORA => {
+            //     if cpu.e || cpu.regs.P.m == 1 {
+            //         let val;
+            //         if self.address_mode == AddressModes::Immediate {
+            //             val = self.payload[0];
+            //         } else {
+            //             val = bus.read(effective_address.unwrap());
+            //         }
+            //         cpu.regs.C.A = cpu.regs.C.A | val as u16;
+            //         if u16::from(cpu.regs.C.A) as u8 >> 7 == 1 {
+            //             cpu.regs.P.n = 1;
+            //         } else {
+            //             cpu.regs.P.n = 0;
+            //         }
+            //         if cpu.regs.C.A == 0 {
+            //             cpu.regs.P.z = 1;
+            //         } else {
+            //             cpu.regs.P.z = 0;
+            //         }
+            //     } else {
+            //         // 16 bit
+            //         let val;
+            //         if self.address_mode == AddressModes::Immediate {
+            //             val = self.payload[0] as u16 | (self.payload[1] as u16) << 8;
+            //         } else {
+            //             val = bus.read(effective_address.unwrap()) as u16
+            //                 | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
+            //         }
+            //         cpu.regs.C = Accumulator::from(u16::from(cpu.regs.C) | val as u16);
+            //         if u16::from(cpu.regs.C) >> 15 == 1 {
+            //             cpu.regs.P.n = 1;
+            //         } else {
+            //             cpu.regs.P.n = 0;
+            //         }
 
-                    if u16::from(cpu.regs.C) == 0 {
-                        cpu.regs.P.z = 1;
-                    } else {
-                        cpu.regs.P.z = 0;
-                    }
-                }
-            }
+            //         if u16::from(cpu.regs.C) == 0 {
+            //             cpu.regs.P.z = 1;
+            //         } else {
+            //             cpu.regs.P.z = 0;
+            //         }
+            //     }
+            // }
             _ => {
                 unimplemented!(
                     "{:?} {:?} payload: {:?}",

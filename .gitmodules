@@ -1,0 +1,3 @@
+[submodule "snes-test-roms"]
+	path = snes-test-roms
+	url = https://gitlab.com/higan/snes-test-roms.git
