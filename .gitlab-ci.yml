@@ -70,7 +70,9 @@ build:cargo:
     - docker
   script:
     - cargo build --release
-    - strip target/release/{superrustendo,snesdbg,snesdis}
+    - strip target/release/superrustendo
+    - strip target/release/snesdbg
+    - strip target/release/snesdis
   artifacts:
     paths:
       - target/release/{superrustendo,snesdbg,snesdis}
