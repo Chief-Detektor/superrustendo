@@ -1,14 +1,8 @@
 FROM rust:alpine 
-# AS foobart
 
-RUN  apk add zip git curl && apk add --no-cache -X http://dl-cdn.alpinelinux.org/alpine/edge/testing lcov && apk add build-base llvm jq
-RUN rustup default nightly && cargo install grcov rustfilt cargo-binutils && rustup component add llvm-tools-preview
+RUN  apk add zip git jq build-base
+RUN rustup default nightly && cargo install cargo-cov
 WORKDIR /APP
 ADD . /APP
 
 RUN git clean -df
-
-
-# FROM 
-#
-# COPY --from=

@@ -47,12 +47,7 @@ coverage:cargo:
   tags:
     - docker
   script:
-    # - export RUSTFLAGS="-Zinstrument-coverage"
-    # - cargo build --verbose
-    # - LLVM_PROFILE_FILE="superrustendo-%p-%m.profraw" cargo test --verbose
-    # - grcov . --binary-path ./target/debug/superrustendo -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o lcov.info
-    # - genhtml -o ./target/cov/ --show-details --highlight --ignore-errors source --legend lcov.info
-    - ./coverage.sh
+    - cargo cov build && cargo cov test && cargo cov report
   artifacts:
     paths:
       - target/cov
