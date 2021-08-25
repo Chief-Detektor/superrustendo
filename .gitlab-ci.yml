@@ -50,7 +50,7 @@ coverage:cargo:
     - cargo cov build && cargo cov test && cargo cov report
   artifacts:
     paths:
-      - target/cov
+      - target/cov/report
 
 doc:cargo:
   stage: build
@@ -100,7 +100,7 @@ pages:
     - doc:cargo
   script:
     - mkdir public
-    - mv target/cov public/cov
+    - mv target/cov/report public/cov
     - mv target/doc public/doc
     - mv pages.html public/index.html
   artifacts:
