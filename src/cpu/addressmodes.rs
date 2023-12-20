@@ -380,7 +380,7 @@ impl AddressModes {
             }
             AddressModes::DirectPageIndirectIndexedY => {
                 if cpu.e || cpu.regs.P.x == 1 {
-                    let mut val;
+                    let val;
                     val = cpu.regs.D + payload[0] as u16;
                     address.address = (bus.read(Address {
                         bank: 0,
@@ -397,7 +397,7 @@ impl AddressModes {
                         + cpu.regs.Y.low as u16;
                     address.bank = cpu.regs.DBR;
                 } else {
-                    let mut val;
+                    let val;
                     val = cpu.regs.D + payload[0] as u16;
                     address.address = (bus.read(Address {
                         bank: 0,
@@ -466,7 +466,7 @@ impl AddressModes {
                     val += val
                         .wrapping_add(cpu.regs.X.low as u8)
                         .wrapping_add(payload[0]);
-                    let indirect = bus.read(Address {
+                    let _indirect = bus.read(Address {
                         bank: 0,
                         address: val as u16,
                     }) as u16

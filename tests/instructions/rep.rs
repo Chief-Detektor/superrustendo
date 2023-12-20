@@ -4,7 +4,7 @@
 mod tests {
     extern crate superrustendo;
 
-    use superrustendo::cpu::{decoder::Opcodes, IndexRegister, StatusRegister};
+    use superrustendo::cpu::{decoder::Opcodes, StatusRegister};
     use superrustendo::{cpu::instructions::Instruction, mem::WRAM};
     use superrustendo::{
         cpu::{addressmodes::AddressModes, decoder::Decoder, CPU},
@@ -19,7 +19,7 @@ mod tests {
             wram: WRAM::new(),
         };
         // let mut bus = Bus { cartridge: None };
-        let mut P = StatusRegister::from(0b11111111);
+        let P = StatusRegister::from(0b11111111);
 
         cpu.get_regs().set_P(&P);
 

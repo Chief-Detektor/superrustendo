@@ -4,11 +4,12 @@ use std::env;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 
+use superrustendo::cpu::decoder::*;
 use superrustendo::cpu::*;
 use superrustendo::mem::Bus;
+use superrustendo::ppu::PPU;
 use superrustendo::tooling::disassembler::PrintToken;
 use superrustendo::{cartridge::Cartridge, mem::WRAM};
-use superrustendo::{cpu::decoder::*, ppu::PPU};
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -29,7 +30,7 @@ fn main() -> std::io::Result<()> {
     let mut bus = Bus {
         cartridge: Some(card),
         wram: WRAM::new(),
-        // ppu: PPU::new(),
+        ppu: PPU::new(),
     };
 
     let decoder = Decoder::new(&mut cpu, &mut bus, true);

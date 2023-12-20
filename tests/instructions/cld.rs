@@ -1,7 +1,7 @@
 mod tests {
     extern crate superrustendo;
 
-    use superrustendo::cpu::{decoder::Opcodes, IndexRegister, StatusRegister};
+    use superrustendo::cpu::{decoder::Opcodes, StatusRegister};
     use superrustendo::{cpu::instructions::Instruction, mem::WRAM};
     use superrustendo::{
         cpu::{addressmodes::AddressModes, decoder::Decoder, CPU},

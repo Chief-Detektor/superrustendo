@@ -2,10 +2,8 @@ use crate::cpu::addressmodes::AddressModes;
 use crate::cpu::decoder::Opcodes;
 use crate::cpu::CPU;
 // use crate::cpu::
-use crate::cpu::{Accumulator, IndexRegister, Registers, StatusRegister};
+use crate::cpu::{Accumulator, IndexRegister, StatusRegister};
 use crate::mem::Bus;
-
-use std::convert::TryInto;
 
 use super::address::Address;
 
@@ -83,7 +81,7 @@ impl Instruction {
     // 2. Is addressing mode immediate?
     // - if yes then payload is value
     // - if not then load value from address and save it to value
-    pub fn execute(&mut self, mut cpu: &mut CPU, bus: &mut Bus, follow_jumps: bool) {
+    pub fn execute(&mut self, cpu: &mut CPU, bus: &mut Bus, follow_jumps: bool) {
         // if this is None it's implied addressing
         let value;
         if self.address_mode != AddressModes::Immediate {
@@ -358,7 +356,7 @@ impl Instruction {
             Opcodes::CMP => {
                 // let val;
                 if !is_16_bit_mem_and_accu(cpu) {
-                    let mut val = value.unwrap().lower_to_number() as u8;
+                    let val = value.unwrap().lower_to_number() as u8;
                     let res = (u16::from(cpu.regs.C.A) as u8) - val;
                     if res >> 7 == 1 {
                         cpu.regs.P.n = 1;
@@ -376,7 +374,7 @@ impl Instruction {
                         cpu.regs.P.c = 0;
                     }
                 } else {
-                    let mut val = value.unwrap().lower_to_number();
+                    let val = value.unwrap().lower_to_number();
                     let res = u16::from(cpu.regs.C) - val as u16;
                     if res >> 15 == 1 {
                         cpu.regs.P.n = 1;
@@ -871,7 +869,7 @@ impl Instruction {
                     }
                     cpu.regs.C.A = data as u16;
                 } else {
-                    let mut data_low = bus.read(effective_address.unwrap());
+                    let data_low = bus.read(effective_address.unwrap());
                     let mut data_high = bus.read(effective_address.unwrap().add(1));
                     if cpu.regs.C.A as i8 - (data_low as i8) < 0 {
                         // borrow required
@@ -1327,7 +1325,7 @@ impl Instruction {
                     }
                     let source = u16::from(cpu.regs.X);
                     let dest = u16::from(cpu.regs.Y);
-                    let length = u16::from(cpu.regs.C);
+                    let _length = u16::from(cpu.regs.C);
 
                     let src_address = Address {
                         bank: src_bnk,

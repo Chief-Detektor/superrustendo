@@ -4,21 +4,21 @@
 //      3. print cpu/regs/stack by pressing p cpu,stack#index -a#cells_after -b#cells_before
 
 // Non stable features
-#![feature(or_patterns)]
 #![recursion_limit = "256"]
 
 use rustyline;
 use rustyline::error::ReadlineError;
-use rustyline::{Cmd, KeyPress};
+use superrustendo::ppu::PPU;
+
 use std::env;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 use std::string::String;
+use superrustendo::cpu::decoder::Decoder;
 use superrustendo::cpu::instructions::Instruction;
 use superrustendo::cpu::*;
 use superrustendo::mem::Bus;
 use superrustendo::{cartridge::Cartridge, mem::WRAM};
-use superrustendo::{cpu::decoder::Decoder, ppu::PPU};
 
 extern crate hex;
 
@@ -40,7 +40,7 @@ fn main() -> Result<()> {
     let mut bus = Bus {
         cartridge: Some(card),
         wram: WRAM::new(),
-        // ppu: PPU::new(),
+        ppu: PPU::new(),
     };
 
     // pretty self explainatory

@@ -4,13 +4,11 @@
 mod tests {
     extern crate superrustendo;
 
-    use std::path::Path;
+    use superrustendo::cpu::{decoder::Opcodes, Accumulator};
 
-    use superrustendo::{cartridge::Cartridge, cpu::{decoder::Opcodes, Accumulator, IndexRegister, StatusRegister}};
-    use superrustendo::cpu::*;
     use superrustendo::{cpu::instructions::Instruction, mem::WRAM};
     use superrustendo::{
-        cpu::{addressmodes::AddressModes, decoder::Decoder, CPU},
+        cpu::{addressmodes::AddressModes, CPU},
         mem::Bus,
     };
 
@@ -84,7 +82,7 @@ mod tests {
             let mut i = Instruction {
                 address: 0x0,
                 opcode: Opcodes::AND,
-                payload: vec![0xff,0xff],
+                payload: vec![0xff, 0xff],
                 address_mode: AddressModes::Immediate,
                 length: 3,
                 cycles: 2,

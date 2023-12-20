@@ -1,5 +1,3 @@
-pub mod wram;
-
 use crate::cartridge::{Cartridge, RomTypes};
 use crate::cpu::address::Address;
 use crate::ppu::PPU;
@@ -20,6 +18,10 @@ impl WRAM {
             extendedRam_2: [0; 0x10000],
         }
     }
+    pub fn read(&self, address: Address) -> u8 {
+        unimplemented!("WRAM read not implemented");
+        0
+    }
 }
 /*
 
@@ -32,19 +34,359 @@ LowRom = Address % 8000 + 8000 * Bank ( + mirror testing)
 pub struct Bus {
     pub cartridge: Option<Cartridge>,
     pub wram: WRAM,
-    // pub ppu: PPU,
+    pub ppu: PPU,
 }
+
+// TODO: Refactor this.
+// Hardware registers first!
 
 impl Bus {
     pub fn read_bytes(&self, address: Address, length: usize) -> Vec<u8> {
         let mut ret = Vec::with_capacity(length);
         for i in 0..length {
-            ret.push(self.read(address.add(i)));
+            if let Some(data) = self.bus_read(address.add(i)) {
+                ret.push(data);
+            }
         }
         ret
     }
+
+    fn get_rom_type(&self) -> Option<RomTypes> {
+        if let Some(card) = self.cartridge.as_ref() {
+            return card.rom_type.clone();
+        }
+        None
+    }
+
+    fn bus_write(&self, address: Address, data: u8) {
+        println!("[Bus Write function]");
+        match address.bank {
+            0x00..=0x3f | 0x80..=0xbf => {}
+            _ => {
+                //self.write(address, data);
+                panic!("Cannot write to ROM!");
+            }
+        }
+    }
+
+    fn bus_read(&self, address: Address) -> Option<u8> {
+        println!("[Bus Read function]");
+        let ret = match address.bank {
+            // From Bank 00-3f and 80-BF otherwise return None
+            0x00..=0x3f | 0x80..=0xbf => {
+                println!("[Bank-Access Hardware Registers]");
+                match address.address {
+                    0x0000..=0x1FFF => {
+                        println!("access to {:x}:{:x} [WRAM]", address.bank, address.address);
+                        // println!("WRAM READ")
+                        return Some(self.wram.lowRam[address.address as usize]);
+                    }
+
+                   // 0x4200..=0x44FF => {
+                   //     println!(
+                   //         "access to {:x}:{:x} [DMA, PPU2, hardware registers]",
+                   //         address.bank, address.address
+                   //     );
+                   // }
+                    0x6000..=0x7FFF => {
+                        println!(
+                            "access to {:x}:{:x} [RESERVED (enhancement chips memory])",
+                            address.bank, address.address
+                        );
+                        return None;
+                    }
+
+                    0x2100..=0x213f => {
+                        println!(
+                            "access to {:x}:{:x} [PPU Registers]",
+                            address.bank, address.address
+                        );
+                        return Some(self.ppu.read(address));
+                    }
+                    0x2140..=0x2143 => {
+                        println!(
+                            "access to {:x}:{:x} [APU I/O Port]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x2180..=0x2183 => {
+                        println!(
+                            "access to {:x}:{:x} [Indirect Work WRAM acceess port]",
+                            address.bank, address.address
+                        );
+                        /*
+                        0x2180 	Indirect Work RAM access port 	The address in 0x2181 through 0x2183 auto-increments after each access
+                        0x2181 	Indirect Work RAM access address (Low byte)
+                        0x2182 	Indirect Work RAM access address (Middle byte)
+                        0x2183 	Indirect Work RAM access address (High bit) 	0000000a a : Memory bank, 0 = 0x7E, 1 = 0x7F
+                        */
+                        return Some(self.wram.read(address));
+                    }
+                    0x3000..=0x3FFF => {
+                        println!(
+                            "access to {:x}:{:x} [DSP, SuperFX, hardware registers]",
+                            address.bank, address.address
+                        );
+                        return None;
+                    }
+                    0x4000..=0x40FF => {
+                        println!(
+                            "access to {:x}:{:x} [Old Style Joypad Registers]",
+                            address.bank, address.address
+                        );
+                        return None;
+                    }
+                    0x4200 => {
+                        println!(
+                            "access to {:x}:{:x} [NMI, V/H Count, Joypad Enable]",
+                            address.bank, address.address
+                        );
+                        // a0bc000d a = NMI b = V-Count c = H-Count d = Joypad
+                        return Some(0);
+                    }
+                    0x4201 => {
+                        println!(
+                            "access to {:x}:{:x} [WRIO - Programmable I/O port (out-port)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4202 => {
+                        println!(
+                            "access to {:x}:{:x} [WRMPYA - Multiplier A]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4203 => {
+                        println!(
+                            "access to {:x}:{:x} [WRMPYB - Multiplier B]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4204 => {
+                        println!(
+                            "access to {:x}:{:x} [WRDIVL - Dividend (low byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4205 => {
+                        println!(
+                            "access to {:x}:{:x} [WRDIVH - Dividend (high byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4206 => {
+                        println!(
+                            "access to {:x}:{:x} [WRDIVB - Divisor B]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4207 => {
+                        println!(
+                            "access to {:x}:{:x} [H-Count Timer (Upper 8 Bits)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4208 => {
+                        println!(
+                            "access to {:x}:{:x} [H-Count MSB (Bit 0)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4209 => {
+                        println!(
+                            "access to {:x}:{:x} [V-Count Timer (Upper 8 Bits)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x420a => {
+                        println!(
+                            "access to {:x}:{:x} [V-Count MSB (Bit 0)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x420b => {
+                        println!(
+                            "access to {:x}:{:x} [Regular DMA Channel Enable]",
+                            address.bank, address.address
+                        );
+                        // abcdefgh a = Channel 7...h = Channel 0: 1 = Enable 0 = Disable
+                        return Some(0);
+                    }
+                    0x420c => {
+                        println!(
+                            "access to {:x}:{:x} [H-DMA Channel Enable]",
+                            address.bank, address.address
+                        );
+                        //  abcdefgh a = Channel 7 .. h = Channel 0: 1 = Enable 0 = Disable
+                        return Some(0);
+                    }
+                    0x420d => {
+                        println!(
+                            "access to {:x}:{:x} [Cycle Speed]",
+                            address.bank, address.address
+                        );
+                        // 0000000a a: 0 = 2.68 MHz, 1 = 3.58 MHz
+                        return Some(0);
+                    }
+                    0x4210 => {
+                        println!(
+                            "access to {:x}:{:x} [NMI Flag and CPU version number]",
+                            address.bank, address.address
+                        );
+                        // a000bbbb a = NMI occurred b = CPU Version number
+                        return Some(0);
+                    }
+                    0x4211 => {
+                        println!(
+                            "access to {:x}:{:x} [IRQ Flag By H/V Count Timer]",
+                            address.bank, address.address
+                        );
+                        // NOTE: This comes from Copilot... so its probably crap 0a000000 a = IRQ occurred
+                        return Some(0);
+                    }
+                    0x4212 => {
+                        println!(
+                            "access to {:x}:{:x} [H/V Blank Flags and Joypad Status]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4213 => {
+                        println!(
+                            "access to {:x}:{:x} [Programmable I/O Port Input]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4214 => {
+                        println!(
+                            "access to {:x}:{:x} [Quotient of Divide Result (low byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4215 => {
+                        println!(
+                            "access to {:x}:{:x} [Quotient of Divide Result (high byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4216 => {
+                        println!(
+                            "access to {:x}:{:x} [Product/Remainder of Result (low byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4217 => {
+                        println!(
+                            "access to {:x}:{:x} [Product/Remainder of Result (high byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4218 => {
+                        println!(
+                            "access to {:x}:{:x} [Joypad 1 Data (Low Byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x421a => {
+                        println!(
+                            "access to {:x}:{:x} [Joypad 2 Data (Low Byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x421c => {
+                        println!(
+                            "access to {:x}:{:x} [Joypad 3 Data (Low Byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x421e => {
+                        println!(
+                            "access to {:x}:{:x} [Joypad 4 Data (Low Byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x4219 => {
+                        println!(
+                            "access to {:x}:{:x} [Joypad 1 Data (High Byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x421b => {
+                        println!(
+                            "access to {:x}:{:x} [Joypad 2 Data (High Byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x421d => {
+                        println!(
+                            "access to {:x}:{:x} [Joypad 3 Data (High Byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+                    0x421f => {
+                        println!(
+                            "access to {:x}:{:x} [Joypad 4 Data (High Byte)]",
+                            address.bank, address.address
+                        );
+                        return Some(0);
+                    }
+
+                    // TODO: DMA registers
+                    0x4300..=0x437a => {
+                        unimplemented!("DMA registers unimplemented!");
+                        //return None;
+                    }
+                    /*
+                    'X' being from 0 to 7:
+                    Address 	Register name 	Comment
+                    0x43X0 	Parameters for DMA Transfer 	ab0cdeee a = Direction b = Type c = Inc/Dec d = Auto/Fixed e = Word Size Select
+                    0x43X1 	B Address
+                    0x43X2 	A Address (Low Byte)
+                    0x43X3 	A Address (High Byte)
+                    0x43X4 	A Address Bank
+                    0x43X5 	Number Bytes to Transfer (Low Byte) (DMA)
+                    0x43X6 	Number Bytes to Transfer (High Byte) (DMA)
+                    0x43X7 	Data Bank (H-DMA)
+                    0x43X8 	A2 Table Address (Low Byte)
+                    0x43X9 	A2 Table Address (High Byte)
+                    0x43Xa 	Number of Lines to Transfer (H-DMA)
+                    */
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+        return ret;
+    }
+
     pub fn read(&self, address: Address) -> u8 {
         // let mut address = address;
+        if let Some(data) = self.bus_read(address) {
+            return data;
+        }
         if let Some(card) = self.cartridge.as_ref() {
             if let Some(rom_type) = &card.rom_type {
                 match rom_type {
@@ -54,39 +396,7 @@ impl Bus {
                         match address.bank {
                             0x00..=0x3F => {
                                 match address.address {
-                                    0x0000..=0x1FFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [WRAM]",
-                                            address.bank, address.address
-                                        );
-                                        // println!("WRAM READ")
-                                        return self.wram.lowRam[address.address as usize];
-                                    }
-                                    0x2100..=0x21FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [PPU1, APU, HW-Registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x3000..=0x3FFF => {
-                                        println!("access to {:x}:{:x} [DSP, SuperFX, hardware registers]", address.bank, address.address);
-                                    }
-                                    0x4000..=0x40FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [Old Style Joypad Registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x4200..=0x44FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [DMA, PPU2, hardware registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x6000..=0x7FFF => {
-                                        println!("access to {:x}:{:x} [RESERVED (enhancement chips memory])", address.bank, address.address);
-                                    }
-                                    0x800..=0xFFFF => {
+                                    0x8000..=0xFFFF => {
                                         println!(
                                             "access to {:x}:{:x} [LoROM section (program memory])",
                                             address.bank, address.address
@@ -102,13 +412,7 @@ impl Bus {
                                             .unwrap()
                                             .read_byte(new as usize);
                                     }
-
-                                    _ => {
-                                        println!(
-                                            " access to {:x}:{:x} is not defined",
-                                            address.bank, address.address
-                                        );
-                                    }
+                                    _ => unimplemented!("Access to {} {} is not defined", address.bank, address.address),
                                 }
                             }
                             0x40..=0x6F => {
@@ -240,38 +544,6 @@ impl Bus {
                         match address.bank {
                             0x00..=0x1F => {
                                 match address.address {
-                                    0x0000..=0x1FFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [WRAM]",
-                                            address.bank, address.address
-                                        );
-                                        // println!("WRAM READ")
-                                        return self.wram.lowRam[address.address as usize];
-                                    }
-                                    0x2100..=0x21FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [PPU1, APU, HW-Registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x3000..=0x3FFF => {
-                                        println!("access to {:x}:{:x} [DSP, SuperFX, hardware registers]", address.bank, address.address);
-                                    }
-                                    0x4000..=0x40FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [Old Style Joypad Registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x4200..=0x44FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [DMA, PPU2, hardware registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x6000..=0x7FFF => {
-                                        println!("access to {:x}:{:x} [RESERVED (enhancement chips memory])", address.bank, address.address);
-                                    }
                                     0x8000..=0xFFFF => {
                                         println!(
                                             "access to {:x}:{:x} [HiROM section (program memory])",
@@ -303,12 +575,6 @@ impl Bus {
                                             address.bank, address.address
                                         );
                                         return self.wram.lowRam[address.address as usize];
-                                    }
-                                    0x2100..=0x21FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [PPU1, APU, hardware registers]",
-                                            address.bank, address.address
-                                        );
                                     }
                                     0x3000..=0x3FFF => {
                                         println!("access to {:x}:{:x} [DSP, SuperFX, hardware registers]", address.bank, address.address);
@@ -438,6 +704,7 @@ impl Bus {
     }
 
     pub fn write(&mut self, address: Address, data: u8) {
+        self.bus_write(address, data);
         if let Some(card) = self.cartridge.as_ref() {
             if let Some(rom_type) = &card.rom_type {
                 match rom_type {
@@ -811,11 +1078,29 @@ impl Bus {
                                         // println!("WRAM READ")
                                         self.wram.lowRam[address.address as usize] = data;
                                     }
-                                    0x2100..=0x21FF => {
+                                    0x2100..=0x213f => {
                                         println!(
                                             "access to {:x}:{:x} [PPU1, APU, HW-Registers]",
                                             address.bank, address.address
                                         );
+                                        // TODO: Delegate to PPU
+                                        !unimplemented!("PPU1");
+                                    }
+                                    0x2140..=0x2143 => {
+                                        println!(
+                                            "access to {:x}:{:x} [APU I/O Port]",
+                                            address.bank, address.address
+                                        );
+                                    }
+                                    0x2180..=0x2183 => {
+                                        println!(
+                                            "access to {:x}:{:x} [Indirect Work RAM access port]",
+                                            address.bank, address.address
+                                        );
+                                        // 0x2180 	Indirect Work RAM access port 	The address in 0x2181 through 0x2183 auto-increments after each access
+                                        // 0x2181 	Indirect Work RAM access address (Low byte)
+                                        // 0x2182 	Indirect Work RAM access address (Middle byte)
+                                        // 0x2183 	Indirect Work RAM access address (High bit) 	0000000a a : Memory bank, 0 = 0x7E, 1 = 0x7F
                                     }
                                     0x3000..=0x3FFF => {
                                         println!("access to {:x}:{:x} [DSP, SuperFX, hardware registers]", address.bank, address.address);

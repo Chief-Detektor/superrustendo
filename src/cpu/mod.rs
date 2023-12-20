@@ -319,7 +319,7 @@ pub struct Registers {
 }
 
 impl Registers {
-    // Setters
+    // Setteras sly as a fox as strong as an oxs
     pub fn set_P(&mut self, P: &StatusRegister) -> &mut Self {
         self.P = *P;
         self

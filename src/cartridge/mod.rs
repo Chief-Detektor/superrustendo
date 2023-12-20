@@ -1,13 +1,11 @@
-use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByteOrder};
+use byte_struct::{ByteStruct, ByteStructLen, ByteStructUnspecifiedByteOrder};
 use std::error::Error;
-use std::ffi::OsStr;
+
 use std::fmt;
 use std::fs::File;
-use std::io;
+
 use std::io::prelude::*;
 use std::path::Path;
-
-use raw_string::RawStr;
 
 use crate::cpu::address::Address;
 

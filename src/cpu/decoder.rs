@@ -439,7 +439,7 @@ pub struct Decoder<'t> {
 
 impl<'t> Decoder<'t> {
     pub fn new(cpu: &'t mut super::CPU, bus: &'t mut Bus, follow_jumps: bool) -> Decoder<'t> {
-        let mut decoder = Decoder {
+        let decoder = Decoder {
             instructions: Vec::new(),
             cpu: cpu,
             bus: bus,
