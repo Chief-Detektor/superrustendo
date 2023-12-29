@@ -1,12 +1,16 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::cartridge::{Cartridge, RomTypes};
-use crate::cpu::address::Address;
+use crate::cpu::address::{self, Address};
+use crate::cpu::CPU;
 use crate::ppu::PPU;
 
 pub struct WRAM {
     lowRam: [u8; 0x2000],  // bank: 0x0-3f (shadowed from 0x7e) 0x0000-0x1fff
     highRam: [u8; 0x6000], // 0x7e
-    extendedRam_1: [u8; 0x8000],
-    extendedRam_2: [u8; 0x10000],
+    extendedRam: [u8; 0x10000],
+    //    extendedRam_2: [u8; 0x10000],
 }
 
 impl WRAM {
@@ -14,13 +18,127 @@ impl WRAM {
         WRAM {
             lowRam: [0xf; 0x2000],
             highRam: [0; 0x6000],
-            extendedRam_1: [0; 0x8000],
-            extendedRam_2: [0; 0x10000],
+            extendedRam: [0; 0x10000],
+            //            extendedRam_2: [0; 0x10000],
         }
     }
-    pub fn read(&self, address: Address) -> u8 {
-        unimplemented!("WRAM read not implemented");
-        0
+    pub fn is_wram(address: Address) -> bool {
+        match address.bank {
+            0x00..=0x3f => match address.address {
+                0x0000..=0x1fff => {
+                    return true;
+                }
+                _ => {
+                    return false;
+                }
+            },
+            0x7e => {
+                match address.address {
+                    0x0000..=0x1fff => {
+                        return true;
+                    }
+                    0x2000..=0x7fff => {
+                        // This xor is needed otherwise access would exceed the memory (highRam
+                        // size is 0x6000
+                        return true;
+                    }
+                    0x8000..=0xffff => {
+                        return true;
+                    }
+                }
+            }
+            0x7f => return true,
+            0x80..=0xbf => match address.address {
+                0x0000..=0x1fff => {
+                    return true;
+                }
+                _ => {
+                    return false;
+                }
+            },
+            _ => {
+                return false;
+            }
+        }
+    }
+
+    fn write(&mut self, address: Address, byte: u8) {
+        match address.bank {
+            0x00..=0x3f => match address.address {
+                0x0000..=0x1fff => {
+                    self.lowRam[address.address as usize] = byte;
+                }
+                _ => {}
+            },
+            0x7e => {
+                match address.address {
+                    0x0000..=0x1fff => {
+                        self.lowRam[address.address as usize] = byte;
+                    }
+                    0x2000..=0x7fff => {
+                        // This xor is needed otherwise access would exceed the memory (highRam
+                        // size is 0x6000
+                        self.highRam[(address.address - 0x2000) as usize] = byte;
+                    }
+                    0x8000..=0xffff => {
+                        self.extendedRam[(address.address) as usize] = byte;
+                    }
+                }
+            }
+            0x7f => {
+                self.extendedRam[address.address as usize] = byte;
+            }
+            0x80..=0xbf => match address.address {
+                0x0000..=0x1fff => {
+                    self.lowRam[address.address as usize] = byte;
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+
+    fn read(&self, address: Address) -> Option<u8> {
+        match address.bank {
+            0x00..=0x3f => match address.address {
+                0x0000..=0x1fff => {
+                    return Some(self.lowRam[address.address as usize]);
+                }
+                _ => {
+                    return None;
+                }
+            },
+            0x7e => {
+                match address.address {
+                    0x0000..=0x1fff => {
+                        return Some(self.lowRam[address.address as usize]);
+                    }
+                    0x2000..=0x7fff => {
+                        // This xor is needed otherwise access would exceed the memory (highRam
+                        // size is 0x6000
+                        // substract the offset from the address
+                        return Some(self.highRam[(address.address - 0x2000) as usize]);
+                    }
+                    0x8000..=0xffff => {
+                        // TODO: is (address ^ 0x8000) needed here?
+                        // I assume not because the address is already mapped to 0x8000..0xffff
+                        return Some(self.extendedRam[(address.address) as usize]);
+                    }
+                }
+            }
+            0x7f => return Some(self.extendedRam[address.address as usize]),
+            0x80..=0xbf => match address.address {
+                0x0000..=0x1fff => {
+                    return Some(self.lowRam[address.address as usize]);
+                }
+                _ => {
+                    return None;
+                }
+            },
+            _ => {
+                return None;
+            }
+        }
     }
 }
 /*
@@ -33,1236 +151,165 @@ LowRom = Address % 8000 + 8000 * Bank ( + mirror testing)
 //#[derive(Debug)]
 pub struct Bus {
     pub cartridge: Option<Cartridge>,
-    pub wram: WRAM,
+    pub wram: Rc<RefCell<WRAM>>,
     pub ppu: PPU,
+    pub cpu: CPU,
+    pub mdr: Rc<RefCell<u8>>,
 }
 
-// TODO: Refactor this.
-// Hardware registers first!
-
 impl Bus {
-    pub fn read_bytes(&self, address: Address, length: usize) -> Vec<u8> {
-        let mut ret = Vec::with_capacity(length);
-        for i in 0..length {
-            if let Some(data) = self.bus_read(address.add(i)) {
-                ret.push(data);
+    pub fn new() -> Self {
+        Bus {
+            cartridge: None,
+            wram: Rc::new(RefCell::new(WRAM::new())),
+            ppu: PPU::new(),
+            cpu: CPU::new(),
+            mdr: Rc::new(RefCell::new(0)),
+        }
+    }
+
+    pub fn set_mdr(&self, byte: u8) {
+        *self.mdr.borrow_mut() = byte;
+    }
+
+    pub fn load_cartridge(&mut self, cartridge: Cartridge) {
+        self.cartridge = Some(cartridge);
+    }
+
+    pub fn get_rom_type(&self) -> Option<RomTypes> {
+        match self.cartridge {
+            Some(ref cartridge) => cartridge.rom_type.clone(),
+            None => panic!("No cartridge loaded"),
+        }
+    }
+
+    fn resolve_rom_address(&self, address: Address) -> Option<Address> {
+        // TODO: Count cycles for rom access
+        // TODO: Hardware registers
+        match self.get_rom_type() {
+            Some(RomTypes::LowRom) => {
+                let bank = address.bank;
+                // Why is this ^ 0x8000 needed?
+                // NOTE: This is because the rom is mapped to 0x8000..0xffff. only half of the
+                // address space is available. (Address line A15 snes is not connected - A16 snes is A15 cardridge and so on shifted by one)
+                let offset = address.address ^ 0x8000;
+                let address_raw: u32 = (bank as u32) << 16 | offset as u32;
+                //println!("Address_raw: {:x}", address_raw);
+                let new_address = Address::new(address_raw);
+                return Some(new_address.mirror(self));
             }
+            Some(RomTypes::HiRom) => {
+                // TODO: Fix that stuff
+                let bank = address.bank;
+                let offset = address.address;
+                let mirror = bank % 0x80;
+                let bank = bank - mirror;
+                let address2: u32 = bank as u32 * 0x8000 + offset as u32;
+                println!("Address: {:x}, Resolved: {:x}", address.address, address2);
+                // TODO: Mirroring
+                return Some(Address::new(address2));
+            }
+            _ => panic!("Unsupported rom type"),
         }
-        ret
     }
 
-    fn get_rom_type(&self) -> Option<RomTypes> {
-        if let Some(card) = self.cartridge.as_ref() {
-            return card.rom_type.clone();
-        }
-        None
-    }
-
-    fn bus_write(&self, address: Address, data: u8) {
-        println!("[Bus Write function]");
+    fn is_wram(&self, address: Address) -> bool {
         match address.bank {
-            0x00..=0x3f | 0x80..=0xbf => {}
-            _ => {
-                //self.write(address, data);
-                panic!("Cannot write to ROM!");
-            }
-        }
-    }
-
-    fn bus_read(&self, address: Address) -> Option<u8> {
-        println!("[Bus Read function]");
-        let ret = match address.bank {
-            // From Bank 00-3f and 80-BF otherwise return None
-            0x00..=0x3f | 0x80..=0xbf => {
-                println!("[Bank-Access Hardware Registers]");
+            0x00..=0x3f => match address.address {
+                0x0000..=0x1fff => {
+                    return true;
+                }
+                _ => {
+                    return false;
+                }
+            },
+            0x7e => {
                 match address.address {
-                    0x0000..=0x1FFF => {
-                        println!("access to {:x}:{:x} [WRAM]", address.bank, address.address);
-                        // println!("WRAM READ")
-                        return Some(self.wram.lowRam[address.address as usize]);
+                    0x0000..=0x1fff => {
+                        return true;
                     }
-
-                   // 0x4200..=0x44FF => {
-                   //     println!(
-                   //         "access to {:x}:{:x} [DMA, PPU2, hardware registers]",
-                   //         address.bank, address.address
-                   //     );
-                   // }
-                    0x6000..=0x7FFF => {
-                        println!(
-                            "access to {:x}:{:x} [RESERVED (enhancement chips memory])",
-                            address.bank, address.address
-                        );
-                        return None;
+                    0x2000..=0x7fff => {
+                        // This xor is needed otherwise access would exceed the memory (highRam
+                        // size is 0x6000
+                        return true;
                     }
-
-                    0x2100..=0x213f => {
-                        println!(
-                            "access to {:x}:{:x} [PPU Registers]",
-                            address.bank, address.address
-                        );
-                        return Some(self.ppu.read(address));
+                    0x8000..=0xffff => {
+                        return true;
                     }
-                    0x2140..=0x2143 => {
-                        println!(
-                            "access to {:x}:{:x} [APU I/O Port]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x2180..=0x2183 => {
-                        println!(
-                            "access to {:x}:{:x} [Indirect Work WRAM acceess port]",
-                            address.bank, address.address
-                        );
-                        /*
-                        0x2180 	Indirect Work RAM access port 	The address in 0x2181 through 0x2183 auto-increments after each access
-                        0x2181 	Indirect Work RAM access address (Low byte)
-                        0x2182 	Indirect Work RAM access address (Middle byte)
-                        0x2183 	Indirect Work RAM access address (High bit) 	0000000a a : Memory bank, 0 = 0x7E, 1 = 0x7F
-                        */
-                        return Some(self.wram.read(address));
-                    }
-                    0x3000..=0x3FFF => {
-                        println!(
-                            "access to {:x}:{:x} [DSP, SuperFX, hardware registers]",
-                            address.bank, address.address
-                        );
-                        return None;
-                    }
-                    0x4000..=0x40FF => {
-                        println!(
-                            "access to {:x}:{:x} [Old Style Joypad Registers]",
-                            address.bank, address.address
-                        );
-                        return None;
-                    }
-                    0x4200 => {
-                        println!(
-                            "access to {:x}:{:x} [NMI, V/H Count, Joypad Enable]",
-                            address.bank, address.address
-                        );
-                        // a0bc000d a = NMI b = V-Count c = H-Count d = Joypad
-                        return Some(0);
-                    }
-                    0x4201 => {
-                        println!(
-                            "access to {:x}:{:x} [WRIO - Programmable I/O port (out-port)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4202 => {
-                        println!(
-                            "access to {:x}:{:x} [WRMPYA - Multiplier A]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4203 => {
-                        println!(
-                            "access to {:x}:{:x} [WRMPYB - Multiplier B]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4204 => {
-                        println!(
-                            "access to {:x}:{:x} [WRDIVL - Dividend (low byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4205 => {
-                        println!(
-                            "access to {:x}:{:x} [WRDIVH - Dividend (high byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4206 => {
-                        println!(
-                            "access to {:x}:{:x} [WRDIVB - Divisor B]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4207 => {
-                        println!(
-                            "access to {:x}:{:x} [H-Count Timer (Upper 8 Bits)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4208 => {
-                        println!(
-                            "access to {:x}:{:x} [H-Count MSB (Bit 0)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4209 => {
-                        println!(
-                            "access to {:x}:{:x} [V-Count Timer (Upper 8 Bits)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x420a => {
-                        println!(
-                            "access to {:x}:{:x} [V-Count MSB (Bit 0)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x420b => {
-                        println!(
-                            "access to {:x}:{:x} [Regular DMA Channel Enable]",
-                            address.bank, address.address
-                        );
-                        // abcdefgh a = Channel 7...h = Channel 0: 1 = Enable 0 = Disable
-                        return Some(0);
-                    }
-                    0x420c => {
-                        println!(
-                            "access to {:x}:{:x} [H-DMA Channel Enable]",
-                            address.bank, address.address
-                        );
-                        //  abcdefgh a = Channel 7 .. h = Channel 0: 1 = Enable 0 = Disable
-                        return Some(0);
-                    }
-                    0x420d => {
-                        println!(
-                            "access to {:x}:{:x} [Cycle Speed]",
-                            address.bank, address.address
-                        );
-                        // 0000000a a: 0 = 2.68 MHz, 1 = 3.58 MHz
-                        return Some(0);
-                    }
-                    0x4210 => {
-                        println!(
-                            "access to {:x}:{:x} [NMI Flag and CPU version number]",
-                            address.bank, address.address
-                        );
-                        // a000bbbb a = NMI occurred b = CPU Version number
-                        return Some(0);
-                    }
-                    0x4211 => {
-                        println!(
-                            "access to {:x}:{:x} [IRQ Flag By H/V Count Timer]",
-                            address.bank, address.address
-                        );
-                        // NOTE: This comes from Copilot... so its probably crap 0a000000 a = IRQ occurred
-                        return Some(0);
-                    }
-                    0x4212 => {
-                        println!(
-                            "access to {:x}:{:x} [H/V Blank Flags and Joypad Status]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4213 => {
-                        println!(
-                            "access to {:x}:{:x} [Programmable I/O Port Input]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4214 => {
-                        println!(
-                            "access to {:x}:{:x} [Quotient of Divide Result (low byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4215 => {
-                        println!(
-                            "access to {:x}:{:x} [Quotient of Divide Result (high byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4216 => {
-                        println!(
-                            "access to {:x}:{:x} [Product/Remainder of Result (low byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4217 => {
-                        println!(
-                            "access to {:x}:{:x} [Product/Remainder of Result (high byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4218 => {
-                        println!(
-                            "access to {:x}:{:x} [Joypad 1 Data (Low Byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x421a => {
-                        println!(
-                            "access to {:x}:{:x} [Joypad 2 Data (Low Byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x421c => {
-                        println!(
-                            "access to {:x}:{:x} [Joypad 3 Data (Low Byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x421e => {
-                        println!(
-                            "access to {:x}:{:x} [Joypad 4 Data (Low Byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x4219 => {
-                        println!(
-                            "access to {:x}:{:x} [Joypad 1 Data (High Byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x421b => {
-                        println!(
-                            "access to {:x}:{:x} [Joypad 2 Data (High Byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x421d => {
-                        println!(
-                            "access to {:x}:{:x} [Joypad 3 Data (High Byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-                    0x421f => {
-                        println!(
-                            "access to {:x}:{:x} [Joypad 4 Data (High Byte)]",
-                            address.bank, address.address
-                        );
-                        return Some(0);
-                    }
-
-                    // TODO: DMA registers
-                    0x4300..=0x437a => {
-                        unimplemented!("DMA registers unimplemented!");
-                        //return None;
-                    }
-                    /*
-                    'X' being from 0 to 7:
-                    Address 	Register name 	Comment
-                    0x43X0 	Parameters for DMA Transfer 	ab0cdeee a = Direction b = Type c = Inc/Dec d = Auto/Fixed e = Word Size Select
-                    0x43X1 	B Address
-                    0x43X2 	A Address (Low Byte)
-                    0x43X3 	A Address (High Byte)
-                    0x43X4 	A Address Bank
-                    0x43X5 	Number Bytes to Transfer (Low Byte) (DMA)
-                    0x43X6 	Number Bytes to Transfer (High Byte) (DMA)
-                    0x43X7 	Data Bank (H-DMA)
-                    0x43X8 	A2 Table Address (Low Byte)
-                    0x43X9 	A2 Table Address (High Byte)
-                    0x43Xa 	Number of Lines to Transfer (H-DMA)
-                    */
-                    _ => None,
                 }
             }
-            _ => None,
-        };
-        return ret;
+            0x7f => return true,
+            0x80..=0xbf => match address.address {
+                0x0000..=0x1fff => {
+                    return true;
+                }
+                _ => {
+                    return false;
+                }
+            },
+            _ => {
+                return false;
+            }
+        }
     }
 
+    fn write_wram(&self, address: Address, byte: u8) {
+        println!("[WRAM WRITE] Bank: {:x} Address: {:x} Value: {:x}", address.bank, address.address, byte);
+        self.wram.borrow_mut().write(address, byte);
+    }
+
+    fn read_wram(&self, address: Address) -> Option<u8> {
+        print!("[WRAM READ] Bank: {:x} Address: {:x}", address.bank, address.address);
+        if let Some(byte) = self.wram.borrow().read(address) {
+            print!(" {:x}\n", byte);
+            return Some(byte);
+        } else {
+            return None;
+        }
+    }
+
+    // Read a single byte from the bus
     pub fn read(&self, address: Address) -> u8 {
-        // let mut address = address;
-        if let Some(data) = self.bus_read(address) {
-            return data;
-        }
-        if let Some(card) = self.cartridge.as_ref() {
-            if let Some(rom_type) = &card.rom_type {
-                match rom_type {
-                    RomTypes::LowRom => {
-                        print!("[BUS]: Mapped read ");
-                        // Mirroring!
-                        match address.bank {
-                            0x00..=0x3F => {
-                                match address.address {
-                                    0x8000..=0xFFFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [LoROM section (program memory])",
-                                            address.bank, address.address
-                                        );
-                                        // Convert to low-rom mapping:
-                                        let new = address.address as u32 % 0x8000 as u32
-                                            + address.bank as u32 * 0x8000 as u32;
-                                        // let bank = (new >> 16) as u8;
-                                        // let address = (new & 0xffffu32) as u16;
-                                        return self
-                                            .cartridge
-                                            .as_ref()
-                                            .unwrap()
-                                            .read_byte(new as usize);
-                                    }
-                                    _ => unimplemented!("Access to {} {} is not defined", address.bank, address.address),
-                                }
-                            }
-                            0x40..=0x6F => {
-                                match address.address {
-                                    0x0000..=0x7FFF => {
-                                        println!("access to {:x}:{:x} [May be mapped as the higher bank ($8000 - $FFFF) if chip is not MAD-1. Otherwise this area is unused.]", address.bank, address.address);
-                                    }
-                                    0x8000..=0xFFFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [LoROM section (program memory])",
-                                            address.bank, address.address
-                                        );
-                                        // Convert to low-rom mapping:
-                                        let new = address.address as u32 % 0x8000 as u32
-                                            + address.bank as u32 * 0x8000 as u32;
-                                        return self
-                                            .cartridge
-                                            .as_ref()
-                                            .unwrap()
-                                            .read_byte(new as usize);
-                                    }
-                                }
-                            }
-                            0x70..=0x7D => {
-                                match address.address {
-                                    0x0000..=0x7FFF => {
-                                        println!("access to {:x}:{:x} [Cartridge SRAM - 448 Kilobytes maximum]", address.bank, address.address);
-                                    }
-                                    0x8000..=0xFFFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [LoROM section (program memory])",
-                                            address.bank, address.address
-                                        );
-                                        // Convert to low-rom mapping:
-                                        let new = address.address as u32 % 0x8000 as u32
-                                            + address.bank as u32 * 0x8000 as u32;
-                                        return self
-                                            .cartridge
-                                            .as_ref()
-                                            .unwrap()
-                                            .read_byte(new as usize);
-                                    }
-                                }
-                            }
-                            0x7E => match address.address {
-                                0x0000..=0x1FFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [LowRAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    return self.wram.lowRam[address.address as usize];
-                                }
-                                0x2000..=0x7FFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [HighRAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    return self.wram.highRam[(address.address - 0x2000) as usize];
-                                }
-                                0x8000..=0xFFFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [Extended RAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    return self.wram.extendedRam_1
-                                        [(address.address - 0x8000) as usize];
-                                }
-                            },
-                            0x7F => match address.address {
-                                0x0000..=0xFFFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [Extended RAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    return self.wram.extendedRam_2[address.address as usize];
-                                }
-                            },
-                            0x80..=0xBF => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $00–$3F]",
-                                    address.bank, address.address
-                                );
-                                // This is just a mirror. redirect to the address
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                return self.read(a);
-                            }
-                            0xC0..=0xEF => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $40–$6F]",
-                                    address.bank, address.address
-                                );
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                return self.read(a);
-                            }
-                            0xF0..=0xFD => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $70–$7D]",
-                                    address.bank, address.address
-                                );
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                return self.read(a);
-                            }
-                            0xFE..=0xFF => {
-                                match address.address {
-                                    0x0000..=0x7FFF => {
-                                        println!("access to {:x}:{:x} [Cartridge SRAM - 64 Kilobytes (512 KB total)]", address.bank, address.address);
-                                        // TODO: Implement Sram (persist as file)
-                                    }
-                                    0x8000..=0xFFFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [LoROM section (program memory)]",
-                                            address.bank, address.address
-                                        );
-                                        println!("access to {:x}:{:x} [Mirror of $7E–$7F (overridden by WRAM in the <$7F range)]", address.bank, address.address);
-                                        let mut a = address;
-                                        a.bank = a.bank - 0x80;
-                                        self.read(a);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    RomTypes::HiRom => {
-                        // Mirroring!
-                        // address
-                        match address.bank {
-                            0x00..=0x1F => {
-                                match address.address {
-                                    0x8000..=0xFFFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [HiROM section (program memory])",
-                                            address.bank, address.address
-                                        );
-                                        // Convert to low-rom mapping:
-                                        let new =
-                                            address.address as u32 + ((address.bank as u32) << 16);
-                                        return self
-                                            .cartridge
-                                            .as_ref()
-                                            .unwrap()
-                                            .read_byte(new as usize);
-                                    }
-
-                                    _ => {
-                                        println!(
-                                            " access to {:x}:{:x} is not defined",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                }
-                            }
-                            0x20..=0x3F => {
-                                match address.address {
-                                    0x0000..=0x1FFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [LowRAM, shadowed from bank $7E]",
-                                            address.bank, address.address
-                                        );
-                                        return self.wram.lowRam[address.address as usize];
-                                    }
-                                    0x3000..=0x3FFF => {
-                                        println!("access to {:x}:{:x} [DSP, SuperFX, hardware registers]", address.bank, address.address);
-                                    }
-                                    0x4000..=0x40FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [Old Style Joypad Registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x4200..=0x44FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [DMA, PPU2, hardware registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x6000..=0x7FFF => {
-                                        println!("access to {:x}:{:x} [Cartridge SRAM - 8 Kilobytes (256 KB total)]", address.bank, address.address);
-                                        // TODO: Implement SRAM (As a seperate file!)
-                                    }
-                                    0x8000..=0xFFFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [HiROM section (program memory)]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    _ => {
-                                        println!(
-                                            "access to {:x}:{:x} is not defined",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                }
-                            }
-                            0x40..=0x7D => {
-                                println!(
-                                    "access to {:x}:{:x} [HiROM section (program memory)]",
-                                    address.bank, address.address
-                                );
-
-                                let new = address.address as u32
-                                    | ((address.bank as u32 - 0x40) << 16 as u32);
-                                println!("Page {:x}", address.bank);
-                                println!("Page {:x}", address.bank - 0x40);
-                                println!("addr {:x}", new);
-                                // let bank = (new >> 16) as u8;
-                                // let address = (new & 0xffffu32) as u16;
-                                return self.cartridge.as_ref().unwrap().read_byte(new as usize);
-                            }
-                            0x7E => match address.address {
-                                0x0000..=0x1FFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [LowRAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    return self.wram.lowRam[address.address as usize];
-                                }
-                                0x2000..=0x7FFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [HighRAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    return self.wram.highRam[(address.address - 0x2000) as usize];
-                                }
-                                0x8000..=0xFFFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [Extended RAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    return self.wram.extendedRam_1
-                                        [(address.address - 0x8000) as usize];
-                                }
-                            },
-                            0x7F => match address.address {
-                                0x0000..=0xFFFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [Extended RAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    return self.wram.extendedRam_2[address.address as usize];
-                                }
-                            },
-                            0x80..=0x9F => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $00–$1F]",
-                                    address.bank, address.address
-                                );
-                                // This is just a mirror. redirect to the address
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                return self.read(a);
-                            }
-                            0xA0..=0xBF => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $20–$3F]",
-                                    address.bank, address.address
-                                );
-                                // This is just a mirror. redirect to the address
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                return self.read(a);
-                            }
-                            0xC0..=0xFD => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $40–$7D]",
-                                    address.bank, address.address
-                                );
-                                // This is just a mirror. redirect to the address
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                return self.read(a);
-                            }
-                            0xFE..=0xFF => {
-                                // let mut a = address;
-                                // a.bank = a.bank - 0xC0;
-                                let a = address.address as usize
-                                    + ((address.bank as usize) - 0xC0) * 0x8000;
-                                // self.read
-                                return self.cartridge.as_ref().unwrap().read_byte(a);
-                            }
-                        }
-                    }
-                };
+        // TODO: First check for WRAM Access
+        //
+        println!(
+            "[BUS Read] Bank {:x}, Address: {:x}",
+            address.bank, address.address
+        );
+        if WRAM::is_wram(address) {
+            if let Some(byte) = self.read_wram(address) {
+                self.set_mdr(byte);
+                return byte;
+            } else {
+                return self.mdr.borrow().clone();
             }
         }
-        return 0;
+        if let Some(address) = self.resolve_rom_address(address) {
+            let ret = self.cartridge.as_ref().unwrap().read_byte(address.into());
+            self.set_mdr(ret);
+            return ret;
+        }
+        unimplemented!("Bus read not implemented");
     }
-
-    pub fn write(&mut self, address: Address, data: u8) {
-        self.bus_write(address, data);
-        if let Some(card) = self.cartridge.as_ref() {
-            if let Some(rom_type) = &card.rom_type {
-                match rom_type {
-                    RomTypes::LowRom => {
-                        print!("[BUS]: Mapped write ");
-                        // Mirroring!
-                        match address.bank {
-                            0x00..=0x3F => match address.address {
-                                0x0000..=0x1fff => {
-                                    println!("WRAM write");
-                                    self.wram.lowRam[address.address as usize] = data;
-                                }
-                                0x2100 => {
-                                    print!("INIDISP - Screen Display: ");
-                                    let force_blank = (data >> 7) != 0;
-                                    let brightness = data & 0xf;
-                                    println!(
-                                        "force blank: {:?}, brightness: {:x}",
-                                        force_blank, brightness
-                                    );
-                                }
-                                0x2101 => {
-                                    print!("OBSEL - Object Size and Character Address: ");
-                                    let object_size = data >> 5;
-                                    let name_select = (data & 0x18) >> 3;
-                                    let name_base_select = data & 0x7;
-                                    println!(
-                    "object_size: 0x{:x}, name_select: 0x{:x}, name_base_select: 0x{:x}",
-                    object_size, name_select, name_base_select
-                );
-                                }
-                                0x2102 => {
-                                    println!("OAMADDL - OAM Address low byte: 0x{:x}", data);
-                                }
-                                0x2103 => {
-                                    print!("OAMADDH - OAM Address high bit and Obj Priority: ");
-
-                                    let p = (data >> 7) != 0;
-                                    let b = (data & 0x1) != 0;
-
-                                    println!(
-                                        "Obj priority activation bit: {:?}, table selector: {:?}",
-                                        p, b
-                                    );
-                                }
-                                0x2104 => {
-                                    println!("OAMDATA - Data for OAM write {:b}", data);
-                                }
-                                0x2105 => {
-                                    // TODO: extract data from payload
-                                    println!("BGMODE - BG Mode and Character Size, {:b}", data);
-                                }
-                                0x2106 => {
-                                    println!("MOSAIC - Screen Pixelation: {:b}", data);
-                                }
-                                0x2107 => {
-                                    println!("BG1SC - BG1 Tilemap Address and Size: {:b}", data);
-                                }
-                                0x2108 => {
-                                    println!("BG2SC - BG2 Tilemap Address and Size: {:b}", data);
-                                }
-                                0x2109 => {
-                                    println!("BG3SC - BG3 Tilemap Address and Size: {:b}", data);
-                                }
-                                0x210a => {
-                                    println!("BG4SC - BG4 Tilemap Address and Size: {:b}", data);
-                                }
-                                0x210b => {
-                                    println!("BG12NBA - BG1 and 2 Chr Address {:b}", data);
-                                }
-                                0x210c => {
-                                    println!("BG34NBA - BG3 and 4 Chr Address {:b}", data);
-                                }
-                                0x210d => {
-                                    println!(
-                    "BG1HOFS - BG1 Horizontal Scroll || M7HOFS  - Mode 7 BG Horizontal Scroll {:b}",
-                    data
-                );
-                                }
-                                0x210e => {
-                                    println!(
-                    "BG1HOFS - BG1 Vertical Scroll || M7HOFS  - Mode 7 BG Vertical Scroll {:b}",
-                    data
-                );
-                                }
-                                0x210f => {
-                                    println!("BG2HOFS - BG2 Horizontal Scroll {:b}", data);
-                                }
-                                0x2110 => {
-                                    println!("BG2VOFS - BG2 Vertical Scroll {:b}", data);
-                                }
-                                0x2111 => {
-                                    println!("BG3HOFS - BG3 Horizontal Scroll {:b}", data);
-                                }
-                                0x2112 => {
-                                    println!("BG3VOFS - BG3 Vertical Scroll {:b}", data);
-                                }
-                                0x2113 => {
-                                    println!("BG4HOFS - BG4 Horizontal Scroll {:b}", data);
-                                }
-                                0x2114 => {
-                                    println!("BG4VOFS - BG4 Vertical Scroll {:b}", data);
-                                }
-                                0x2115 => {
-                                    println!("VMAIN - Video Port Control {:b}", data);
-                                }
-                                0x2116 => {
-                                    println!("VMADDL - VRAM Address low byte {:b}", data);
-                                }
-                                0x2117 => {
-                                    println!("VMADDH - VRAM Address high byte {:b}", data);
-                                }
-                                0x2118 => {
-                                    println!("VMDATAL - VRAM Data Write low byte {:b}", data);
-                                }
-                                0x2119 => {
-                                    println!("VMDATAH - VRAM Data Write high byte {:b}", data);
-                                }
-                                0x211a => {
-                                    println!("M7SEL - Mode 7 Settings {:b}", data);
-                                }
-                                0x211b => {
-                                    println!(
-                                        "M7A - Mode 7 Matrix A (also used with $2134/6) {:b}",
-                                        data
-                                    );
-                                }
-                                0x211c => {
-                                    println!(
-                                        "M7B - Mode 7 Matrix B (also used with $2134/6) {:b}",
-                                        data
-                                    );
-                                }
-                                0x211d => {
-                                    println!("M7C - Mode 7 Matrix C {:b}", data);
-                                }
-                                0x211e => {
-                                    println!("M7D - Mode 7 Matrix D {:b}", data);
-                                }
-                                0x211f => {
-                                    println!("M7X - Mode 7 Center X {:b}", data);
-                                }
-                                0x2120 => {
-                                    println!("M7Y - Mode 7 Center Y {:b}", data);
-                                }
-                                0x2121 => {
-                                    println!("CGRAM Address {:b}", data);
-                                }
-                                0x2122 => {
-                                    println!("CGDATA - CGRAM Data write {:b}", data);
-                                }
-                                0x2123 => {
-                                    println!(
-                                        "W12SEL - Window Mask Settings for BG1 and BG2 {:b}",
-                                        data
-                                    );
-                                }
-                                0x2124 => {
-                                    println!(
-                                        "W34SEL - Window Mask Settings for BG3 and BG4 {:b}",
-                                        data
-                                    );
-                                }
-                                0x2125 => {
-                                    println!(
-                    "WOBJSEL - Window Mask Settings for OBJ and Color Window {:b}",
-                    data
-                );
-                                }
-                                0x2126 => {
-                                    println!("WH0 - Window 1 Left Position {:b}", data);
-                                }
-                                0x2127 => {
-                                    println!("WH1 - Window 1 Right Position {:b}", data);
-                                }
-                                0x2128 => {
-                                    println!("WH2 - Window 2 Left Position {:b}", data);
-                                }
-                                0x2129 => {
-                                    println!("WH3 - Window 2 Right Position {:b}", data);
-                                }
-                                0x212a => {
-                                    println!("WBGLOG - Window mask logic for BGs {:b}", data);
-                                }
-                                0x212b => {
-                                    println!(
-                    "WOBJLOG - Window mask logic for OBJs and Color Window {:b}",
-                    data
-                );
-                                }
-                                0x212c => {
-                                    println!("TM - Main Screen Designation {:b}", data);
-                                }
-                                0x212d => {
-                                    println!("TS - Subscreen Designation {:b}", data);
-                                }
-                                0x212e => {
-                                    println!(
-                                        "TMW - Window Mask Designation for the Main Screen {:b}",
-                                        data
-                                    );
-                                }
-                                0x212f => {
-                                    println!(
-                                        "TSW - Window Mask Designation for the Subscreen {:b}",
-                                        data
-                                    );
-                                }
-                                0x2130 => {
-                                    println!("CGWSEL - Color Addition Select {:b}", data);
-                                }
-                                0x2131 => {
-                                    println!("CGADSUB - Color math designation {:b}", data);
-                                }
-                                0x2132 => {
-                                    println!("COLDATA - Fixed Color Data {:b}", data);
-                                }
-                                0x2133 => {
-                                    println!("SETINI - Screen Mode/Video Select {:b}", data);
-                                }
-                                // TODO: Missing Regs
-                                0x4200 => {
-                                    println!("NMITIMEN - Interrupt Enable Flags {:b}", data);
-                                    // TODO: Power on and reset => 0x00
-                                }
-                                0x4201 => {
-                                    println!("WRIO - Programmable I/O port (out-port) {:b}", data);
-                                }
-                                0x4202 => {
-                                    println!("WRMPYA - Multiplicand A {:b}", data);
-                                    // TODO: 0xff on powerup/reset
-                                }
-                                0x4203 => {
-                                    println!("WRMPYB - Multiplicand B {:b}", data);
-                                }
-                                0x4204 => {
-                                    println!("WRDIVL - Dividend C low byte {:b}", data);
-                                }
-                                0x4205 => {
-                                    println!("WRDIVH - Dividend C high byte {:b}", data);
-                                }
-                                0x4206 => {
-                                    println!("WRDIVB - Divisor B {:b}", data);
-                                }
-                                0x4207 => {
-                                    println!("HTIMEL - H Timer low byte {:b}", data);
-                                }
-                                0x4208 => {
-                                    println!("HTIMEH - H Timer high byte {:b}", data);
-                                }
-                                0x4209 => {
-                                    println!("VTIMEL - V Timer low byte {:b}", data);
-                                }
-                                0x420a => {
-                                    println!("VTIMEH - V Timer high byte {:b}", data);
-                                }
-                                0x420b => {
-                                    println!("MDMAEN - DMA Enable {:b}", data);
-                                }
-                                0x420c => {
-                                    println!("HDMAEN - HDMA Enable {:b}", data);
-                                }
-                                0x420d => {
-                                    println!("MEMSEL - ROM Access Speed {:b}", data);
-                                }
-                                // 0x420e => {
-                                //   println!("RDNMI - NMI Flag and 5A22 Version {:b}", data);
-                                // }
-                                // 0x210d => {
-                                //   println!("BG1HOFS - BG1 Horizontal Scroll {:b}", data);
-                                // }
-                                // 0x210d => {
-                                //   println!("BG1HOFS - BG1 Horizontal Scroll {:b}", data);
-                                // }
-                                // 0x210d => {
-                                //   println!("BG1HOFS - BG1 Horizontal Scroll {:b}", data);
-                                // }
-                                // 0x210d => {
-                                //   println!("BG1HOFS - BG1 Horizontal Scroll {:b}", data);
-                                // }
-                                _ => println!(
-                                    "Unimpl Register {:x}:{:x}",
-                                    address.bank, address.address
-                                ), //unimplemented!("Register {:x}", address),
-                            },
-                            0x40..=0x6F => {}
-                            0x70..=0x7D => match address.address {
-                                0x0000..=0x7FFF => {
-                                    println!("access to {:x}:{:x} [Cartridge SRAM - 448 Kilobytes maximum]", address.bank, address.address);
-                                }
-                                _ => {
-                                    println!(
-                                        "access to {:x}:{:x} [Program ROM -------IGNORED]",
-                                        address.bank, address.address
-                                    );
-                                }
-                            },
-                            0x7E => match address.address {
-                                0x0000..=0x1FFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [LowRAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    self.wram.lowRam[address.address as usize] = data;
-                                }
-                                0x2000..=0x7FFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [HighRAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    self.wram.highRam[(address.address - 0x2000) as usize] = data;
-                                }
-                                0x8000..=0xFFFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [Extended RAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    self.wram.extendedRam_1[(address.address - 0x8000) as usize] =
-                                        data;
-                                }
-                            },
-                            0x7F => match address.address {
-                                0x0000..=0xFFFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [Extended RAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    self.wram.extendedRam_2[address.address as usize] = data;
-                                }
-                            },
-                            0x80..=0xBF => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $00–$3F]",
-                                    address.bank, address.address
-                                );
-                                // This is just a mirror. redirect to the address
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                self.write(a, data);
-                            }
-                            0xC0..=0xEF => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $40–$6F]",
-                                    address.bank, address.address
-                                );
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                self.write(a, data);
-                            }
-                            0xF0..=0xFD => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $70–$7D]",
-                                    address.bank, address.address
-                                );
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                self.write(a, data);
-                            }
-                            0xFE..=0xFF => {}
-                        }
-                    }
-                    RomTypes::HiRom => {
-                        match address.bank {
-                            0x00..=0x1F => {
-                                match address.address {
-                                    0x0000..=0x1FFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [WRAM]",
-                                            address.bank, address.address
-                                        );
-                                        // println!("WRAM READ")
-                                        self.wram.lowRam[address.address as usize] = data;
-                                    }
-                                    0x2100..=0x213f => {
-                                        println!(
-                                            "access to {:x}:{:x} [PPU1, APU, HW-Registers]",
-                                            address.bank, address.address
-                                        );
-                                        // TODO: Delegate to PPU
-                                        !unimplemented!("PPU1");
-                                    }
-                                    0x2140..=0x2143 => {
-                                        println!(
-                                            "access to {:x}:{:x} [APU I/O Port]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x2180..=0x2183 => {
-                                        println!(
-                                            "access to {:x}:{:x} [Indirect Work RAM access port]",
-                                            address.bank, address.address
-                                        );
-                                        // 0x2180 	Indirect Work RAM access port 	The address in 0x2181 through 0x2183 auto-increments after each access
-                                        // 0x2181 	Indirect Work RAM access address (Low byte)
-                                        // 0x2182 	Indirect Work RAM access address (Middle byte)
-                                        // 0x2183 	Indirect Work RAM access address (High bit) 	0000000a a : Memory bank, 0 = 0x7E, 1 = 0x7F
-                                    }
-                                    0x3000..=0x3FFF => {
-                                        println!("access to {:x}:{:x} [DSP, SuperFX, hardware registers]", address.bank, address.address);
-                                    }
-                                    0x4000..=0x40FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [Old Style Joypad Registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x4200..=0x44FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [DMA, PPU2, hardware registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x6000..=0x7FFF => {
-                                        println!("access to {:x}:{:x} [RESERVED (enhancement chips memory])", address.bank, address.address);
-                                    }
-                                    0x8000..=0xFFFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [HiROM section (program memory]) IGNORED",
-                                            address.bank, address.address
-                                        );
-                                    }
-
-                                    _ => {
-                                        println!(
-                                            " access to {:x}:{:x} is not defined",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                }
-                            }
-                            0x20..=0x3F => {
-                                match address.address {
-                                    0x0000..=0x1FFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [LowRAM, shadowed from bank $7E]",
-                                            address.bank, address.address
-                                        );
-                                        self.wram.lowRam[address.address as usize] = data;
-                                    }
-                                    0x2100..=0x21FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [PPU1, APU, hardware registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x3000..=0x3FFF => {
-                                        println!("access to {:x}:{:x} [DSP, SuperFX, hardware registers]", address.bank, address.address);
-                                    }
-                                    0x4000..=0x40FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [Old Style Joypad Registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x4200..=0x44FF => {
-                                        println!(
-                                            "access to {:x}:{:x} [DMA, PPU2, hardware registers]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    0x6000..=0x7FFF => {
-                                        println!("access to {:x}:{:x} [Cartridge SRAM - 8 Kilobytes (256 KB total)]", address.bank, address.address);
-                                        // TODO: Implement SRAM (As a seperate file!)
-                                    }
-                                    0x8000..=0xFFFF => {
-                                        println!(
-                                            "access to {:x}:{:x} [HiROM section (program memory)]",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                    _ => {
-                                        println!(
-                                            "access to {:x}:{:x} is not defined",
-                                            address.bank, address.address
-                                        );
-                                    }
-                                }
-                            }
-                            0x40..=0x7D => {
-                                println!(
-                                    "access to {:x}:{:x} [HiROM section (program memory)] IGNORED",
-                                    address.bank, address.address
-                                );
-                            }
-                            0x7E => match address.address {
-                                0x0000..=0x1FFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [LowRAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    self.wram.lowRam[address.address as usize] = data;
-                                }
-                                0x2000..=0x7FFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [HighRAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    self.wram.highRam[(address.address - 0x2000) as usize] = data;
-                                }
-                                0x8000..=0xFFFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [Extended RAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    self.wram.extendedRam_1[(address.address - 0x8000) as usize] =
-                                        data;
-                                }
-                            },
-                            0x7F => match address.address {
-                                0x0000..=0xFFFF => {
-                                    println!(
-                                        "access to {:x}:{:x} [Extended RAM (WRAM)]",
-                                        address.bank, address.address
-                                    );
-                                    self.wram.extendedRam_2[address.address as usize] = data;
-                                }
-                            },
-                            0x80..=0x9F => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $00–$1F]",
-                                    address.bank, address.address
-                                );
-                                // This is just a mirror. redirect to the address
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                self.write(a, data);
-                            }
-                            0xA0..=0xBF => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $20–$3F]",
-                                    address.bank, address.address
-                                );
-                                // This is just a mirror. redirect to the address
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                self.write(a, data);
-                            }
-                            0xC0..=0xFD => {
-                                println!(
-                                    "access to {:x}:{:x} [Mirror of $40–$7D]",
-                                    address.bank, address.address
-                                );
-                                // This is just a mirror. redirect to the address
-                                let mut a = address;
-                                a.bank = a.bank - 0x80;
-                                self.write(a, data);
-                            }
-                            0xFE..=0xFF => {
-                                let mut a = address;
-                                a.bank = address.bank - 0xC0;
-
-                                // self.read
-                                self.write(a, data);
-                            }
-                        }
-                    }
-                }
-            }
+    // Read n bytes from the bus
+    pub fn read_bytes(&self, address: Address, length: usize) -> Vec<u8> {
+        println!("Reading {} bytes from address: {:?}", length, address);
+        let mut bytes: Vec<u8> = Vec::with_capacity(length);
+        for i in 0..length {
+            bytes.push(self.read(address.add(i)));
         }
+        bytes
+    }
+    // Write a single byte to the bus
+    pub fn write(&self, address: Address, value: u8) {
+        if WRAM::is_wram(address) {
+            self.write_wram(address, value);
+            return;
+        }
+        println!(
+            "[BUS Write] {:x}, to Bank {:x}, Address: {:x}",
+            value, address.bank, address.address
+        );
+        unimplemented!("Bus write not implemented");
     }
 }

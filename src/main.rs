@@ -30,16 +30,11 @@ fn main() -> std::io::Result<()> {
     let card = cartridge::Cartridge::load_rom(Path::new(&args[1])).expect("Error loading");
     println!("Loaded Cardidge: {:?}", card.header);
 
-    let mut cpu = CPU::new();
-
     // TODO: Fix address offsets => rom mapping starts at 0x8000.. for bank 00
-    let mut bus = Bus {
-        cartridge: Some(card),
-        wram: WRAM::new(),
-        ppu: PPU::new(),
-    };
+    let mut bus = Bus::new();
+    bus.load_cartridge(card);
 
-    let decoder = Decoder::new(&mut cpu, &mut bus, true);
+    let decoder = Decoder::new(&mut bus, true);
 
     for (_i, instr) in decoder.enumerate() {
         instr.print_info();

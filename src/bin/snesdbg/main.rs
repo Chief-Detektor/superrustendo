@@ -10,9 +10,11 @@ use rustyline;
 use rustyline::error::ReadlineError;
 use superrustendo::ppu::PPU;
 
+use std::cell::RefCell;
 use std::env;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
+use std::rc::Rc;
 use std::string::String;
 use superrustendo::cpu::decoder::Decoder;
 use superrustendo::cpu::instructions::Instruction;
@@ -39,15 +41,16 @@ fn main() -> Result<()> {
     // This translates addresses to components or correct memory locations
     let mut bus = Bus {
         cartridge: Some(card),
-        wram: WRAM::new(),
+        wram: Rc::new(RefCell::new(WRAM::new())),
         ppu: PPU::new(),
+        cpu: CPU::new(),
+        mdr: Rc::new(RefCell::new(0)),
     };
 
     // pretty self explainatory
-    let mut cpu = CPU::new();
 
     // decoder is an iteratior that iterates over the program code
-    let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
+    let mut decoder = Decoder::new(&mut bus, true);
 
     // the readline handle
     let mut rl = rustyline::Editor::<()>::new();
@@ -109,7 +112,7 @@ fn eval_line(line: String, decoder: &mut Decoder) -> bool {
         }
         Some("p" | "print") => {
             match command.next() {
-                Some(thing) if thing == "cpu" => println!("{:?}", decoder.cpu),
+                Some(thing) if thing == "cpu" => println!("{:?}", decoder.bus.cpu),
                 _ => {}
             }
             println!("Print: {:?}", command.next());
