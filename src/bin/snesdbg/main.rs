@@ -4,21 +4,25 @@
 //      3. print cpu/regs/stack by pressing p cpu,stack#index -a#cells_after -b#cells_before
 
 // Non stable features
-#![feature(or_patterns)]
 #![recursion_limit = "256"]
 
 use rustyline;
 use rustyline::error::ReadlineError;
-use rustyline::{Cmd, KeyPress};
+use superrustendo::ppu::PPU;
+
+use std::cell::RefCell;
 use std::env;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
+use std::rc::Rc;
 use std::string::String;
 use superrustendo::cpu::decoder::Decoder;
 use superrustendo::cpu::instructions::Instruction;
 use superrustendo::cpu::*;
 use superrustendo::mem::Bus;
 use superrustendo::{cartridge::Cartridge, mem::WRAM};
+
+extern crate hex;
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -37,14 +41,16 @@ fn main() -> Result<()> {
     // This translates addresses to components or correct memory locations
     let mut bus = Bus {
         cartridge: Some(card),
-        wram: WRAM::new(),
+        wram: Rc::new(RefCell::new(WRAM::new())),
+        ppu: PPU::new(),
+        cpu: CPU::new(),
+        mdr: Rc::new(RefCell::new(0)),
     };
 
     // pretty self explainatory
-    let mut cpu = CPU::new();
 
     // decoder is an iteratior that iterates over the program code
-    let mut decoder = Decoder::new(&mut cpu, &mut bus, true);
+    let mut decoder = Decoder::new(&mut bus, true);
 
     // the readline handle
     let mut rl = rustyline::Editor::<()>::new();
@@ -76,6 +82,18 @@ fn print_instruction(inst: Option<Instruction>) {
 fn eval_line(line: String, decoder: &mut Decoder) -> bool {
     let mut command = line.split_whitespace();
     match command.next() {
+        Some("b" | "break") => {
+            if let Some(addr) = command.next() {
+                let val = hex::decode(addr);
+                match val {
+                    Ok(v) => {
+                        println!("Value: {:?} hex: {:x}{:x}", v, v[0], v[1]);
+                    }
+                    Err(_) => {}
+                }
+                // println!("Adding breakpoint at {:x}", hex::encode(&addr).parse::<u64>().unwrap());
+            }
+        }
         Some("s" | "step") => {
             match command.next() {
                 Some(steps) => {
@@ -94,7 +112,7 @@ fn eval_line(line: String, decoder: &mut Decoder) -> bool {
         }
         Some("p" | "print") => {
             match command.next() {
-                Some(thing) if thing == "cpu" => println!("{:?}", decoder.cpu),
+                Some(thing) if thing == "cpu" => println!("{:?}", decoder.bus.cpu),
                 _ => {}
             }
             println!("Print: {:?}", command.next());

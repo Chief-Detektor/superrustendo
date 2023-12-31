@@ -1,7 +1,9 @@
 use byte_struct::{bitfields, ByteStruct, ByteStructLen, ByteStructUnspecifiedByteOrder};
 
+use std::cell::RefCell;
 use std::convert::From;
 use std::fmt;
+use std::rc::Rc;
 
 pub mod address;
 pub mod addressmodes;
@@ -232,8 +234,8 @@ impl Default for StatusRegister {
 bitfields!(
   #[derive(PartialEq, Copy, Clone)]
   pub Accumulator: u16 {
-    pub A: 8,
-    pub B: 8,
+    A: 8,
+    B: 8,
   }
 );
 
@@ -246,6 +248,23 @@ impl fmt::Debug for Accumulator {
 impl Default for Accumulator {
     fn default() -> Accumulator {
         Accumulator { A: 0, B: 0 }
+    }
+}
+
+impl Accumulator {
+    pub fn get_A(&self) -> u8 {
+        return self.A as u8;
+    }
+    pub fn get_B(&self) -> u8 {
+        return self.B as u8;
+    }
+    pub fn set_A(&mut self, A: u8) -> &mut Self {
+        self.A = A.into();
+        self
+    }
+    pub fn set_B(&mut self, B: u8) -> &mut Self {
+        self.B = B.into();
+        self
     }
 }
 
@@ -302,7 +321,7 @@ pub struct Registers {
 }
 
 impl Registers {
-    // Setters
+    // Setteras sly as a fox as strong as an oxs
     pub fn set_P(&mut self, P: &StatusRegister) -> &mut Self {
         self.P = *P;
         self
@@ -371,8 +390,8 @@ impl Registers {
 
 #[derive(Debug)]
 pub struct CPU {
-    regs: Registers,
-    stack: Stack,
+    regs: Rc<RefCell<Registers>>,
+    stack: Rc<RefCell<Stack>>,
     e: bool, // Emulation mode
 }
 
@@ -395,29 +414,34 @@ impl Default for Registers {
 impl CPU {
     pub fn new() -> CPU {
         CPU {
-            regs: Registers::default(),
-            stack: Stack::default(),
+            regs: Rc::new(RefCell::new(Registers::default())),
+            stack: Rc::new(RefCell::new(Stack::default())),
             e: true,
         }
     }
-
-    pub fn get_regs(&mut self) -> &mut Registers {
-        return &mut self.regs;
+    pub fn is_16_bit_mem_and_accu(&self) -> bool {
+        !self.e && self.regs.borrow().P.m != 1
+    }
+    pub fn is_16_bit_index(&self) -> bool {
+        !self.e && self.regs.borrow().P.x != 1
+    }
+    pub fn get_regs(&self) -> Registers {
+        return *self.regs.borrow_mut();
     }
 
     pub fn get_emulation_mode(&self) -> bool {
         return self.e;
     }
-    pub fn set_regs(&mut self, regs: &Registers) {
-        self.regs = *regs;
+    pub fn set_regs(&self, regs: &Registers) {
+        *self.regs.borrow_mut() = *regs;
     }
 
     pub fn set_emulation_mode(&mut self, e: bool) {
         self.e = e;
     }
 
-    pub fn stack_push(&mut self, payload: u8) {
-        let index = <u16>::from(self.regs.S);
+    pub fn stack_push(&self, payload: u8) {
+        let index = <u16>::from(self.regs.borrow().S);
         println!("Pushing {:x} on stack address {:x}", payload, index);
 
         let mut new_index: i32 = index as i32 - 1;
@@ -425,19 +449,19 @@ impl CPU {
         if new_index == -1 {
             new_index = 0xffff
         }
-        self.stack.content[(new_index) as usize] = payload;
-        self.regs.S = IndexRegister::from(new_index as u16);
+        self.stack.borrow_mut().content[(new_index) as usize] = payload;
+        self.regs.borrow_mut().S = IndexRegister::from(new_index as u16);
     }
 
-    pub fn stack_pull(&mut self) -> u8 {
-        let index = <u16>::from(self.regs.S);
-        let ret = self.stack.content[index as usize];
+    pub fn stack_pull(&self) -> u8 {
+        let index = <u16>::from(self.regs.borrow().S);
+        let ret = self.stack.borrow().content[index as usize];
 
         let mut new_index: i32 = index as i32 + 1;
         if new_index == 0x10000 {
             new_index = 0;
         }
-        self.regs.S = IndexRegister::from(new_index as u16);
+        self.regs.borrow_mut().S = IndexRegister::from(new_index as u16);
         println!("Popping {:x} from Stack", ret);
         ret
     }

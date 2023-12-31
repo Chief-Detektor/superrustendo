@@ -7,6 +7,7 @@ use std::path::Path;
 use superrustendo::cpu::decoder::*;
 use superrustendo::cpu::*;
 use superrustendo::mem::Bus;
+use superrustendo::ppu::PPU;
 use superrustendo::tooling::disassembler::PrintToken;
 use superrustendo::{cartridge::Cartridge, mem::WRAM};
 
@@ -29,9 +30,11 @@ fn main() -> std::io::Result<()> {
     let mut bus = Bus {
         cartridge: Some(card),
         wram: WRAM::new(),
+        ppu: PPU::new(),
+        cpu,
     };
 
-    let decoder = Decoder::new(&mut cpu, &mut bus, true);
+    let decoder = Decoder::new(&mut bus.cpu, &mut bus, true);
 
     let mut labels = HashMap::new();
     let mut decoded_asm = Vec::new();

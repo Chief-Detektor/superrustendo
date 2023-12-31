@@ -1,11 +1,16 @@
-pub mod wram;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::cartridge::{Cartridge, RomTypes};
-use crate::cpu::address::Address;
+use crate::cpu::address::{self, Address};
+use crate::cpu::CPU;
+use crate::ppu::PPU;
 
 pub struct WRAM {
     lowRam: [u8; 0x2000],  // bank: 0x0-3f (shadowed from 0x7e) 0x0000-0x1fff
     highRam: [u8; 0x6000], // 0x7e
+    extendedRam: [u8; 0x10000],
+    //    extendedRam_2: [u8; 0x10000],
 }
 
 impl WRAM {
@@ -13,319 +18,298 @@ impl WRAM {
         WRAM {
             lowRam: [0xf; 0x2000],
             highRam: [0; 0x6000],
+            extendedRam: [0; 0x10000],
+            //            extendedRam_2: [0; 0x10000],
+        }
+    }
+    pub fn is_wram(address: Address) -> bool {
+        match address.bank {
+            0x00..=0x3f => match address.address {
+                0x0000..=0x1fff => {
+                    return true;
+                }
+                _ => {
+                    return false;
+                }
+            },
+            0x7e => {
+                match address.address {
+                    0x0000..=0x1fff => {
+                        return true;
+                    }
+                    0x2000..=0x7fff => {
+                        // This xor is needed otherwise access would exceed the memory (highRam
+                        // size is 0x6000
+                        return true;
+                    }
+                    0x8000..=0xffff => {
+                        return true;
+                    }
+                }
+            }
+            0x7f => return true,
+            0x80..=0xbf => match address.address {
+                0x0000..=0x1fff => {
+                    return true;
+                }
+                _ => {
+                    return false;
+                }
+            },
+            _ => {
+                return false;
+            }
+        }
+    }
+
+    fn write(&mut self, address: Address, byte: u8) {
+        match address.bank {
+            0x00..=0x3f => match address.address {
+                0x0000..=0x1fff => {
+                    self.lowRam[address.address as usize] = byte;
+                }
+                _ => {}
+            },
+            0x7e => {
+                match address.address {
+                    0x0000..=0x1fff => {
+                        self.lowRam[address.address as usize] = byte;
+                    }
+                    0x2000..=0x7fff => {
+                        // This xor is needed otherwise access would exceed the memory (highRam
+                        // size is 0x6000
+                        self.highRam[(address.address - 0x2000) as usize] = byte;
+                    }
+                    0x8000..=0xffff => {
+                        self.extendedRam[(address.address) as usize] = byte;
+                    }
+                }
+            }
+            0x7f => {
+                self.extendedRam[address.address as usize] = byte;
+            }
+            0x80..=0xbf => match address.address {
+                0x0000..=0x1fff => {
+                    self.lowRam[address.address as usize] = byte;
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+
+    fn read(&self, address: Address) -> Option<u8> {
+        match address.bank {
+            0x00..=0x3f => match address.address {
+                0x0000..=0x1fff => {
+                    return Some(self.lowRam[address.address as usize]);
+                }
+                _ => {
+                    return None;
+                }
+            },
+            0x7e => {
+                match address.address {
+                    0x0000..=0x1fff => {
+                        return Some(self.lowRam[address.address as usize]);
+                    }
+                    0x2000..=0x7fff => {
+                        // This xor is needed otherwise access would exceed the memory (highRam
+                        // size is 0x6000
+                        // substract the offset from the address
+                        return Some(self.highRam[(address.address - 0x2000) as usize]);
+                    }
+                    0x8000..=0xffff => {
+                        // TODO: is (address ^ 0x8000) needed here?
+                        // I assume not because the address is already mapped to 0x8000..0xffff
+                        return Some(self.extendedRam[(address.address) as usize]);
+                    }
+                }
+            }
+            0x7f => return Some(self.extendedRam[address.address as usize]),
+            0x80..=0xbf => match address.address {
+                0x0000..=0x1fff => {
+                    return Some(self.lowRam[address.address as usize]);
+                }
+                _ => {
+                    return None;
+                }
+            },
+            _ => {
+                return None;
+            }
         }
     }
 }
+/*
 
-// impl WRAM {
-//   fn write(address: )
-// }
+LowRom = Address % 8000 + 8000 * Bank ( + mirror testing)
+
+
+*/
 
 //#[derive(Debug)]
 pub struct Bus {
     pub cartridge: Option<Cartridge>,
-    pub wram: WRAM,
+    pub wram: Rc<RefCell<WRAM>>,
+    pub ppu: PPU,
+    pub cpu: CPU,
+    pub mdr: Rc<RefCell<u8>>,
 }
 
 impl Bus {
-    pub fn read(&self, address: Address) -> u8 {
-        println!("Bus Read: {:x}:{:x}", address.bank, address.address);
-        match address.address {
-            0x0000..=0x1FFF => {
-                // println!("WRAM READ")
-                return self.wram.lowRam[address.address as usize];
-            }
-            0x2100..=0x21ff => {
-                println!("=> Access to PPU1, APU, HW-Registers");
-                // match address => {
-                //   0x2100 =>
-                // }
-            }
-            0x8000..=0xffff => {
-                if self.cartridge.as_ref().unwrap().rom_type == Some(RomTypes::LowRom) {
-                    // println!("=> Access to ROM at 0x{:x}", address.address ^ 0x8000);
-                    return self.cartridge.as_ref().unwrap().rom
-                        [(address.address as usize) ^ 0x8000];
-                } else {
-                    // println!("=> Access to ROM at 0x{:x}", address.address as usize);
-                    return self.cartridge.as_ref().unwrap().rom[address.address as usize];
-                }
-            }
-            _ => {}
-        };
-        return 0;
-    }
-    // TODO: Implement rom type agnostic writes
-    pub fn write(&mut self, address: Address, data: u8) {
-        println!(
-            "Bus Write: {:x} to {:x}:{:x}",
-            data, address.bank, address.address
-        );
-        match address.address {
-            0x0000..=0x1fff => {
-                // println!("WRAM write");
-                self.wram.lowRam[address.address as usize] = data;
-            }
-            0x2100 => {
-                print!("INIDISP - Screen Display: ");
-                let force_blank = (data >> 7) != 0;
-                let brightness = data & 0xf;
-                println!(
-                    "force blank: {:?}, brightness: {:x}",
-                    force_blank, brightness
-                );
-            }
-            0x2101 => {
-                print!("OBSEL - Object Size and Character Address: ");
-                let object_size = data >> 5;
-                let name_select = (data & 0x18) >> 3;
-                let name_base_select = data & 0x7;
-                println!(
-                    "object_size: 0x{:x}, name_select: 0x{:x}, name_base_select: 0x{:x}",
-                    object_size, name_select, name_base_select
-                );
-            }
-            0x2102 => {
-                println!("OAMADDL - OAM Address low byte: 0x{:x}", data);
-            }
-            0x2103 => {
-                print!("OAMADDH - OAM Address high bit and Obj Priority: ");
-
-                let p = (data >> 7) != 0;
-                let b = (data & 0x1) != 0;
-
-                println!(
-                    "Obj priority activation bit: {:?}, table selector: {:?}",
-                    p, b
-                );
-            }
-            0x2104 => {
-                println!("OAMDATA - Data for OAM write {:b}", data);
-            }
-            0x2105 => {
-                // TODO: extract data from payload
-                println!("BGMODE - BG Mode and Character Size, {:b}", data);
-            }
-            0x2106 => {
-                println!("MOSAIC - Screen Pixelation: {:b}", data);
-            }
-            0x2107 => {
-                println!("BG1SC - BG1 Tilemap Address and Size: {:b}", data);
-            }
-            0x2108 => {
-                println!("BG2SC - BG2 Tilemap Address and Size: {:b}", data);
-            }
-            0x2109 => {
-                println!("BG3SC - BG3 Tilemap Address and Size: {:b}", data);
-            }
-            0x210a => {
-                println!("BG4SC - BG4 Tilemap Address and Size: {:b}", data);
-            }
-            0x210b => {
-                println!("BG12NBA - BG1 and 2 Chr Address {:b}", data);
-            }
-            0x210c => {
-                println!("BG34NBA - BG3 and 4 Chr Address {:b}", data);
-            }
-            0x210d => {
-                println!(
-                    "BG1HOFS - BG1 Horizontal Scroll || M7HOFS  - Mode 7 BG Horizontal Scroll {:b}",
-                    data
-                );
-            }
-            0x210e => {
-                println!(
-                    "BG1HOFS - BG1 Vertical Scroll || M7HOFS  - Mode 7 BG Vertical Scroll {:b}",
-                    data
-                );
-            }
-            0x210f => {
-                println!("BG2HOFS - BG2 Horizontal Scroll {:b}", data);
-            }
-            0x2110 => {
-                println!("BG2VOFS - BG2 Vertical Scroll {:b}", data);
-            }
-            0x2111 => {
-                println!("BG3HOFS - BG3 Horizontal Scroll {:b}", data);
-            }
-            0x2112 => {
-                println!("BG3VOFS - BG3 Vertical Scroll {:b}", data);
-            }
-            0x2113 => {
-                println!("BG4HOFS - BG4 Horizontal Scroll {:b}", data);
-            }
-            0x2114 => {
-                println!("BG4VOFS - BG4 Vertical Scroll {:b}", data);
-            }
-            0x2115 => {
-                println!("VMAIN - Video Port Control {:b}", data);
-            }
-            0x2116 => {
-                println!("VMADDL - VRAM Address low byte {:b}", data);
-            }
-            0x2117 => {
-                println!("VMADDH - VRAM Address high byte {:b}", data);
-            }
-            0x2118 => {
-                println!("VMDATAL - VRAM Data Write low byte {:b}", data);
-            }
-            0x2119 => {
-                println!("VMDATAH - VRAM Data Write high byte {:b}", data);
-            }
-            0x211a => {
-                println!("M7SEL - Mode 7 Settings {:b}", data);
-            }
-            0x211b => {
-                println!("M7A - Mode 7 Matrix A (also used with $2134/6) {:b}", data);
-            }
-            0x211c => {
-                println!("M7B - Mode 7 Matrix B (also used with $2134/6) {:b}", data);
-            }
-            0x211d => {
-                println!("M7C - Mode 7 Matrix C {:b}", data);
-            }
-            0x211e => {
-                println!("M7D - Mode 7 Matrix D {:b}", data);
-            }
-            0x211f => {
-                println!("M7X - Mode 7 Center X {:b}", data);
-            }
-            0x2120 => {
-                println!("M7Y - Mode 7 Center Y {:b}", data);
-            }
-            0x2121 => {
-                println!("CGRAM Address {:b}", data);
-            }
-            0x2122 => {
-                println!("CGDATA - CGRAM Data write {:b}", data);
-            }
-            0x2123 => {
-                println!("W12SEL - Window Mask Settings for BG1 and BG2 {:b}", data);
-            }
-            0x2124 => {
-                println!("W34SEL - Window Mask Settings for BG3 and BG4 {:b}", data);
-            }
-            0x2125 => {
-                println!(
-                    "WOBJSEL - Window Mask Settings for OBJ and Color Window {:b}",
-                    data
-                );
-            }
-            0x2126 => {
-                println!("WH0 - Window 1 Left Position {:b}", data);
-            }
-            0x2127 => {
-                println!("WH1 - Window 1 Right Position {:b}", data);
-            }
-            0x2128 => {
-                println!("WH2 - Window 2 Left Position {:b}", data);
-            }
-            0x2129 => {
-                println!("WH3 - Window 2 Right Position {:b}", data);
-            }
-            0x212a => {
-                println!("WBGLOG - Window mask logic for BGs {:b}", data);
-            }
-            0x212b => {
-                println!(
-                    "WOBJLOG - Window mask logic for OBJs and Color Window {:b}",
-                    data
-                );
-            }
-            0x212c => {
-                println!("TM - Main Screen Designation {:b}", data);
-            }
-            0x212d => {
-                println!("TS - Subscreen Designation {:b}", data);
-            }
-            0x212e => {
-                println!(
-                    "TMW - Window Mask Designation for the Main Screen {:b}",
-                    data
-                );
-            }
-            0x212f => {
-                println!("TSW - Window Mask Designation for the Subscreen {:b}", data);
-            }
-            0x2130 => {
-                println!("CGWSEL - Color Addition Select {:b}", data);
-            }
-            0x2131 => {
-                println!("CGADSUB - Color math designation {:b}", data);
-            }
-            0x2132 => {
-                println!("COLDATA - Fixed Color Data {:b}", data);
-            }
-            0x2133 => {
-                println!("SETINI - Screen Mode/Video Select {:b}", data);
-            }
-            // TODO: Missing Regs
-            0x4200 => {
-                println!("NMITIMEN - Interrupt Enable Flags {:b}", data);
-                // TODO: Power on and reset => 0x00
-            }
-            0x4201 => {
-                println!("WRIO - Programmable I/O port (out-port) {:b}", data);
-            }
-            0x4202 => {
-                println!("WRMPYA - Multiplicand A {:b}", data);
-                // TODO: 0xff on powerup/reset
-            }
-            0x4203 => {
-                println!("WRMPYB - Multiplicand B {:b}", data);
-            }
-            0x4204 => {
-                println!("WRDIVL - Dividend C low byte {:b}", data);
-            }
-            0x4205 => {
-                println!("WRDIVH - Dividend C high byte {:b}", data);
-            }
-            0x4206 => {
-                println!("WRDIVB - Divisor B {:b}", data);
-            }
-            0x4207 => {
-                println!("HTIMEL - H Timer low byte {:b}", data);
-            }
-            0x4208 => {
-                println!("HTIMEH - H Timer high byte {:b}", data);
-            }
-            0x4209 => {
-                println!("VTIMEL - V Timer low byte {:b}", data);
-            }
-            0x420a => {
-                println!("VTIMEH - V Timer high byte {:b}", data);
-            }
-            0x420b => {
-                println!("MDMAEN - DMA Enable {:b}", data);
-            }
-            0x420c => {
-                println!("HDMAEN - HDMA Enable {:b}", data);
-            }
-            0x420d => {
-                println!("MEMSEL - ROM Access Speed {:b}", data);
-            }
-            // 0x420e => {
-            //   println!("RDNMI - NMI Flag and 5A22 Version {:b}", data);
-            // }
-            // 0x210d => {
-            //   println!("BG1HOFS - BG1 Horizontal Scroll {:b}", data);
-            // }
-            // 0x210d => {
-            //   println!("BG1HOFS - BG1 Horizontal Scroll {:b}", data);
-            // }
-            // 0x210d => {
-            //   println!("BG1HOFS - BG1 Horizontal Scroll {:b}", data);
-            // }
-            // 0x210d => {
-            //   println!("BG1HOFS - BG1 Horizontal Scroll {:b}", data);
-            // }
-            _ => println!("Unimpl Register {:x}:{:x}", address.bank, address.address), //unimplemented!("Register {:x}", address),
+    pub fn new() -> Self {
+        Bus {
+            cartridge: None,
+            wram: Rc::new(RefCell::new(WRAM::new())),
+            ppu: PPU::new(),
+            cpu: CPU::new(),
+            mdr: Rc::new(RefCell::new(0)),
         }
     }
-    // pub fn write_u16(&mut self, address: usize, data: u16) {
-    //   // let mut card_ref = self.cartridge.as_ref().unwrap();
-    //   // card_ref.rom[address] = data & 0x00ff;
-    //   // card_ref.rom
-    //   // (data & 0xff00) >> 8;
-    // }
+
+    pub fn set_mdr(&self, byte: u8) {
+        *self.mdr.borrow_mut() = byte;
+    }
+
+    pub fn load_cartridge(&mut self, cartridge: Cartridge) {
+        self.cartridge = Some(cartridge);
+    }
+
+    pub fn get_rom_type(&self) -> Option<RomTypes> {
+        match self.cartridge {
+            Some(ref cartridge) => cartridge.rom_type.clone(),
+            None => panic!("No cartridge loaded"),
+        }
+    }
+
+    fn resolve_rom_address(&self, address: Address) -> Option<Address> {
+        // TODO: Count cycles for rom access
+        // TODO: Hardware registers
+        match self.get_rom_type() {
+            Some(RomTypes::LowRom) => {
+                let bank = address.bank;
+                // Why is this ^ 0x8000 needed?
+                // NOTE: This is because the rom is mapped to 0x8000..0xffff. only half of the
+                // address space is available. (Address line A15 snes is not connected - A16 snes is A15 cardridge and so on shifted by one)
+                let offset = address.address ^ 0x8000;
+                let address_raw: u32 = (bank as u32) << 16 | offset as u32;
+                //println!("Address_raw: {:x}", address_raw);
+                let new_address = Address::new(address_raw);
+                return Some(new_address.mirror(self));
+            }
+            Some(RomTypes::HiRom) => {
+                // TODO: Fix that stuff
+                let bank = address.bank;
+                let offset = address.address;
+                let mirror = bank % 0x80;
+                let bank = bank - mirror;
+                let address2: u32 = bank as u32 * 0x8000 + offset as u32;
+                println!("Address: {:x}, Resolved: {:x}", address.address, address2);
+                // TODO: Mirroring
+                return Some(Address::new(address2));
+            }
+            _ => panic!("Unsupported rom type"),
+        }
+    }
+
+    fn is_wram(&self, address: Address) -> bool {
+        match address.bank {
+            0x00..=0x3f => match address.address {
+                0x0000..=0x1fff => {
+                    return true;
+                }
+                _ => {
+                    return false;
+                }
+            },
+            0x7e => {
+                match address.address {
+                    0x0000..=0x1fff => {
+                        return true;
+                    }
+                    0x2000..=0x7fff => {
+                        // This xor is needed otherwise access would exceed the memory (highRam
+                        // size is 0x6000
+                        return true;
+                    }
+                    0x8000..=0xffff => {
+                        return true;
+                    }
+                }
+            }
+            0x7f => return true,
+            0x80..=0xbf => match address.address {
+                0x0000..=0x1fff => {
+                    return true;
+                }
+                _ => {
+                    return false;
+                }
+            },
+            _ => {
+                return false;
+            }
+        }
+    }
+
+    fn write_wram(&self, address: Address, byte: u8) {
+        println!("[WRAM WRITE] Bank: {:x} Address: {:x} Value: {:x}", address.bank, address.address, byte);
+        self.wram.borrow_mut().write(address, byte);
+    }
+
+    fn read_wram(&self, address: Address) -> Option<u8> {
+        print!("[WRAM READ] Bank: {:x} Address: {:x}", address.bank, address.address);
+        if let Some(byte) = self.wram.borrow().read(address) {
+            print!(" {:x}\n", byte);
+            return Some(byte);
+        } else {
+            return None;
+        }
+    }
+
+    // Read a single byte from the bus
+    pub fn read(&self, address: Address) -> u8 {
+        // TODO: First check for WRAM Access
+        //
+        println!(
+            "[BUS Read] Bank {:x}, Address: {:x}",
+            address.bank, address.address
+        );
+        if WRAM::is_wram(address) {
+            if let Some(byte) = self.read_wram(address) {
+                self.set_mdr(byte);
+                return byte;
+            } else {
+                return self.mdr.borrow().clone();
+            }
+        }
+        if let Some(address) = self.resolve_rom_address(address) {
+            let ret = self.cartridge.as_ref().unwrap().read_byte(address.into());
+            self.set_mdr(ret);
+            return ret;
+        }
+        unimplemented!("Bus read not implemented");
+    }
+    // Read n bytes from the bus
+    pub fn read_bytes(&self, address: Address, length: usize) -> Vec<u8> {
+        println!("Reading {} bytes from address: {:?}", length, address);
+        let mut bytes: Vec<u8> = Vec::with_capacity(length);
+        for i in 0..length {
+            bytes.push(self.read(address.add(i)));
+        }
+        bytes
+    }
+    // Write a single byte to the bus
+    pub fn write(&self, address: Address, value: u8) {
+        if WRAM::is_wram(address) {
+            self.write_wram(address, value);
+            return;
+        }
+        println!(
+            "[BUS Write] {:x}, to Bank {:x}, Address: {:x}",
+            value, address.bank, address.address
+        );
+        unimplemented!("Bus write not implemented");
+    }
 }

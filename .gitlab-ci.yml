@@ -47,24 +47,33 @@ coverage:cargo:
   tags:
     - docker
   script:
-    # - export RUSTFLAGS="-Zinstrument-coverage"
-    # - cargo build --verbose
-    # - LLVM_PROFILE_FILE="superrustendo-%p-%m.profraw" cargo test --verbose
-    # - grcov . --binary-path ./target/debug/superrustendo -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o lcov.info
-    # - genhtml -o ./target/cov/ --show-details --highlight --ignore-errors source --legend lcov.info
-    - ./coverage.sh
+    # - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
+    - export RUSTFLAGS="-Zinstrument-coverage"
+    - cargo build --verbose
+    - LLVM_PROFILE_FILE="superrustendo-%p-%m.profraw" cargo test --verbose
+    - grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o lcov.info
+    - genhtml -o ./target/cov/ --show-details --highlight --ignore-errors source --legend lcov.info
+  cache:
+    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
+    paths:
+      - target/debug
+      - target/release
+      - target/cov
+    policy: pull
   artifacts:
     paths:
       - target/cov
 
 doc:cargo:
   stage: build
-  image: $CI_REGISTRY_IMAGE
+  image: rust:latest
   tags:
     - docker
   script:
+    - rustup default nightly
     - cargo doc --no-deps
-  artifacts:
+  cache:
+    key: "$CI_JOB_NAME-$CI_COMMIT_REF_SLUG"
     paths:
       - target/doc
 
@@ -82,17 +91,17 @@ build:cargo:
     untracked: false
     expire_in: 30 days
 
-docker:
-  tags:
-    - docker
-  image: docker
-  stage: deploy
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $CI_REGISTRY_IMAGE .
-    - docker push $CI_REGISTRY_IMAGE
-  only:
-    - master
+# docker:
+#   tags:
+#     - docker
+#   image: docker
+#   stage: deploy
+#   script:
+#     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#     - docker build -t $CI_REGISTRY_IMAGE .
+#     - docker push $CI_REGISTRY_IMAGE
+# only:
+# - master
 # TODO: Build release image containing only alpine and build binaries
 
 pages:
@@ -104,10 +113,20 @@ pages:
     - coverage:cargo
     - doc:cargo
   script:
-    - mkdir public
-    - mv target/cov public/cov
-    - mv target/doc public/doc
-    - mv pages.html public/index.html
+    # - find target/cov -xtype l -delete
+    # - mkdir -p public/$CI_COMMIT_REF_NAME
+    - mv target/cov public/
+    # - echo '<html>
+    #   <body>
+    #   <a href="./doc">documentation</a></br>
+    #   <a href="./develop">develop</a></br>
+    #   <a href="./master">main</a></br>
+    #   <a href="./$CI_COMMIT_REF_NAME">$CI_COMMIT_REF_NAME</a></br>
+    #   </body>
+    #   </html>' > public/index.html
+    # - mv target/doc public/doc
+    # - mv test_results.json public
+    # - mv bench_results.json public
   artifacts:
     paths:
       - public
