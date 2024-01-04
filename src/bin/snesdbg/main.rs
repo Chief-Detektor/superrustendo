@@ -8,19 +8,16 @@
 
 use rustyline;
 use rustyline::error::ReadlineError;
-use superrustendo::ppu::PPU;
 
-use std::cell::RefCell;
 use std::env;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
-use std::rc::Rc;
 use std::string::String;
 use superrustendo::cpu::decoder::Decoder;
 use superrustendo::cpu::instructions::Instruction;
-use superrustendo::cpu::*;
+
 use superrustendo::mem::Bus;
-use superrustendo::{cartridge::Cartridge, mem::WRAM};
+use superrustendo::{cartridge::Cartridge};
 
 extern crate hex;
 
@@ -39,17 +36,13 @@ fn main() -> Result<()> {
     println!("Loaded Cardidge: {:?}", card.header);
 
     // This translates addresses to components or correct memory locations
-    let mut bus = Bus {
-        cartridge: Some(card),
-        wram: Rc::new(RefCell::new(WRAM::new())),
-        ppu: PPU::new(),
-        cpu: CPU::new(),
-        mdr: Rc::new(RefCell::new(0)),
-    };
+    let mut bus = Bus::new();
+    bus.load_cartridge(card);
 
-    // pretty self explainatory
+    //bus.insert_cartridge(card);
+    // pretty self explanatory
 
-    // decoder is an iteratior that iterates over the program code
+    // decoder is an iterator that iterates over the program code
     let mut decoder = Decoder::new(&mut bus, true);
 
     // the readline handle
@@ -112,7 +105,7 @@ fn eval_line(line: String, decoder: &mut Decoder) -> bool {
         }
         Some("p" | "print") => {
             match command.next() {
-                Some(thing) if thing == "cpu" => println!("{:?}", decoder.bus.cpu),
+                Some(thing) if thing == "cpu" => println!("{:?}", decoder.get_bus().get_cpu()),
                 _ => {}
             }
             println!("Print: {:?}", command.next());

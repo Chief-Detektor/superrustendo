@@ -2,7 +2,7 @@ use super::address::Address;
 use super::constants::*;
 use super::decoder::Opcodes;
 use super::Registers;
-use super::CPU;
+
 use crate::mem::Bus;
 use std::convert::TryInto;
 
@@ -28,8 +28,8 @@ pub enum AddressModes {
     DirectPageIndirectLongIndexedY,
     Immediate,
     Implied,
-    ProgrammCounterRelative,
-    ProgrammCounterRelativeLong,
+    ProgramCounterRelative,
+    ProgramCounterRelativeLong,
     StackAbsolute,
     StackDirectPageIndirect,
     StackInterrupt,
@@ -68,12 +68,19 @@ impl AddressModes {
             AddressModes::DirectPageIndirectLongIndexedY => 2,
             AddressModes::Immediate => {
                 match *op {
-                    Opcodes::LDX | Opcodes::CPX | Opcodes::LDY => {
+                    Opcodes::LDX | Opcodes::CPX | Opcodes::CPY | Opcodes::LDY => {
                         if regs.P.x != 1 {
                             return 3;
                         }
                     }
-                    Opcodes::LDA | Opcodes::BIT | Opcodes::AND => {
+                    Opcodes::ADC
+                    | Opcodes::AND
+                    | Opcodes::BIT
+                    | Opcodes::CMP
+                    | Opcodes::EOR
+                    | Opcodes::LDA
+                    | Opcodes::ORA
+                    | Opcodes::SBC => {
                         if regs.P.m == 0 {
                             return 3;
                         }
@@ -82,9 +89,17 @@ impl AddressModes {
                 }
                 return 2;
             }
-            AddressModes::Implied => 1,
-            AddressModes::ProgrammCounterRelative => 2,
-            AddressModes::ProgrammCounterRelativeLong => 3,
+            AddressModes::Implied => {
+                match *op {
+                    Opcodes::BRK | Opcodes::STP => {
+                        return 3;
+                    },
+                    _ => {}
+                }
+                return 1;
+            },
+            AddressModes::ProgramCounterRelative => 2,
+            AddressModes::ProgramCounterRelativeLong => 3,
             AddressModes::StackAbsolute => 3,
             AddressModes::StackDirectPageIndirect => 2,
             AddressModes::StackInterrupt => 2,
@@ -222,11 +237,10 @@ impl AddressModes {
                     indirect_address += x;
                 }
 
-                let addresss_low = bus.read(address);
-                let addresss_high = bus.read(address.add(1));
+                let address_low = bus.read(address);
+                let address_high = bus.read(address.add(1));
 
-                // bus.get_cpu().regs.borrow().PC = (bus.get_cpu().regs.borrow().PBR as u32) << 16 | (addresss_high as u32) << 8 | addresss_low as u32;
-                address.address = (addresss_high as u16) << 8 | addresss_low as u16;
+                address.address = ((address_high as u16) << 8 | address_low as u16) + indirect_address;
                 return Some(address);
             }
             AddressModes::AbsoluteLong => {
@@ -253,7 +267,7 @@ impl AddressModes {
                 }
                 return Some(address);
             } // TODO: Return Payload as slice?
-            AddressModes::ProgrammCounterRelative => {
+            AddressModes::ProgramCounterRelative => {
                 let offset: i8 = payload[0] as _;
                 let foo = offset as i16;
                 address.address = (foo as i32 + (bus.get_cpu().regs.borrow().PC as i32))
@@ -263,10 +277,10 @@ impl AddressModes {
                 // return (((bus.get_cpu().regs.borrow().PBR as u32) << 16) | address) as usize;
                 return Some(address);
             }
-            AddressModes::ProgrammCounterRelativeLong => {
+            AddressModes::ProgramCounterRelativeLong => {
                 let offset = payload[0] as u16 | (payload[1] as u16) << 8;
-                let sign_offest = offset as i16;
-                address.address = (sign_offest as i32 + (bus.get_cpu().regs.borrow().PC as i32))
+                let sign_offset = offset as i16;
+                address.address = (sign_offset as i32 + (bus.get_cpu().regs.borrow().PC as i32))
                     .try_into()
                     .unwrap();
                 address.bank = bus.get_cpu().regs.borrow().PBR;
@@ -309,14 +323,16 @@ impl AddressModes {
             }
             AddressModes::StackInterrupt => {
                 if !bus.get_cpu().get_emulation_mode() {
-                    bus.get_cpu().stack_push(bus.get_cpu().regs.borrow().PBR);
+                    let pbr = bus.get_cpu().get_regs().PBR;
+                    bus.get_cpu().stack_push(pbr);
                 }
                 let pc_high = (bus.get_cpu().regs.borrow().PC >> 8) as u8;
                 let pc_low = (bus.get_cpu().regs.borrow().PC & 0xff) as u8;
                 bus.get_cpu().stack_push(pc_high);
                 bus.get_cpu().stack_push(pc_low);
+                let p = bus.get_cpu().regs.borrow().P.into();
                 bus.get_cpu()
-                    .stack_push(bus.get_cpu().regs.borrow().P.into());
+                    .stack_push(p);
 
                 // TODO: Eval this
                 let interrupt_vector;

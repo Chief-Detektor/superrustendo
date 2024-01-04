@@ -112,7 +112,7 @@ impl PPU {
             oam: OAM::new(),
         }
     }
-    pub fn read(&self, address: Address) -> u8 {
+    pub fn read(&self, _address: Address) -> u8 {
         !unimplemented!();
         0
     }

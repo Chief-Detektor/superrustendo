@@ -1,13 +1,13 @@
-use crate::cpu::address::Address;
+
 use crate::cpu::addressmodes::{
     get_gi_addr_mode, get_gii_addr_mode, get_gii_reg_load_addr_mode, AddressModes,
 };
 use crate::cpu::constants::*;
 use crate::cpu::instructions::Instruction;
-use crate::cpu::CPU;
+
 use crate::mem::Bus;
-use std::convert::TryInto;
-use std::num::Wrapping;
+
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Opcodes {
@@ -201,12 +201,12 @@ fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
         G3_OP_COP => Some((Opcodes::COP, AddressModes::StackInterrupt)),
         G3_OP_PHP => Some((Opcodes::PHP, AddressModes::StackPush)),
         G3_OP_PHD => Some((Opcodes::PHD, AddressModes::StackPush)),
-        G3_OP_BPL => Some((Opcodes::BPL, AddressModes::ProgrammCounterRelative)),
+        G3_OP_BPL => Some((Opcodes::BPL, AddressModes::ProgramCounterRelative)),
         G3_OP_CLC => Some((Opcodes::CLC, AddressModes::Implied)),
         G3_OP_TCS => Some((Opcodes::TCS, AddressModes::Implied)),
         G3_OP_PLP => Some((Opcodes::PLP, AddressModes::StackPull)),
         G3_OP_PLD => Some((Opcodes::PLD, AddressModes::StackPull)),
-        G3_OP_BMI => Some((Opcodes::BMI, AddressModes::ProgrammCounterRelative)),
+        G3_OP_BMI => Some((Opcodes::BMI, AddressModes::ProgramCounterRelative)),
         G3_OP_SEC => Some((Opcodes::SEC, AddressModes::Implied)),
         G3_OP_TSC => Some((Opcodes::TSC, AddressModes::Implied)),
         G3_OP_RTI => Some((Opcodes::RTI, AddressModes::StackRTI)),
@@ -214,7 +214,7 @@ fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
         G3_OP_MVP => Some((Opcodes::MVP, AddressModes::BlockMove)),
         G3_OP_PHA => Some((Opcodes::PHA, AddressModes::StackPush)),
         G3_OP_PHK => Some((Opcodes::PHK, AddressModes::StackPush)),
-        G3_OP_BVC => Some((Opcodes::BVC, AddressModes::ProgrammCounterRelative)),
+        G3_OP_BVC => Some((Opcodes::BVC, AddressModes::ProgramCounterRelative)),
         G3_OP_MVN => Some((Opcodes::MVN, AddressModes::BlockMove)),
         G3_OP_CLI => Some((Opcodes::CLI, AddressModes::Implied)),
         G3_OP_PHY => Some((Opcodes::PHY, AddressModes::StackPush)),
@@ -223,23 +223,23 @@ fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
         G3_OP_PER => Some((Opcodes::PER, AddressModes::StackPCRelativeLong)),
         G3_OP_PLA => Some((Opcodes::PLA, AddressModes::StackPull)),
         G3_OP_RTL => Some((Opcodes::RTL, AddressModes::StackRTL)),
-        G3_OP_BVS => Some((Opcodes::BVS, AddressModes::ProgrammCounterRelative)),
+        G3_OP_BVS => Some((Opcodes::BVS, AddressModes::ProgramCounterRelative)),
         G3_OP_SEI => Some((Opcodes::SEI, AddressModes::Implied)),
         G3_OP_PLY => Some((Opcodes::PLY, AddressModes::StackPull)),
         G3_OP_TDC => Some((Opcodes::TDC, AddressModes::Implied)),
-        G3_OP_BRA => Some((Opcodes::BRA, AddressModes::ProgrammCounterRelative)),
-        G3_OP_BRL => Some((Opcodes::BRL, AddressModes::ProgrammCounterRelativeLong)),
+        G3_OP_BRA => Some((Opcodes::BRA, AddressModes::ProgramCounterRelative)),
+        G3_OP_BRL => Some((Opcodes::BRL, AddressModes::ProgramCounterRelativeLong)),
         G3_OP_DEY => Some((Opcodes::DEY, AddressModes::Implied)),
         G3_OP_TXA => Some((Opcodes::TXA, AddressModes::Implied)),
         G3_OP_PHB => Some((Opcodes::PHB, AddressModes::StackPush)),
-        G3_OP_BCC => Some((Opcodes::BCC, AddressModes::ProgrammCounterRelative)),
+        G3_OP_BCC => Some((Opcodes::BCC, AddressModes::ProgramCounterRelative)),
         G3_OP_TYA => Some((Opcodes::TYA, AddressModes::Implied)),
         G3_OP_TXS => Some((Opcodes::TXS, AddressModes::Implied)),
         G3_OP_TXY => Some((Opcodes::TXY, AddressModes::Implied)),
         G3_OP_TAY => Some((Opcodes::TAY, AddressModes::Implied)),
         G3_OP_TAX => Some((Opcodes::TAX, AddressModes::Implied)),
         G3_OP_PLB => Some((Opcodes::PLB, AddressModes::StackPull)),
-        G3_OP_BCS => Some((Opcodes::BCS, AddressModes::ProgrammCounterRelative)),
+        G3_OP_BCS => Some((Opcodes::BCS, AddressModes::ProgramCounterRelative)),
         G3_OP_CLV => Some((Opcodes::CLV, AddressModes::Implied)),
         G3_OP_TSX => Some((Opcodes::TSX, AddressModes::Implied)),
         G3_OP_TYX => Some((Opcodes::TYX, AddressModes::Implied)),
@@ -247,7 +247,7 @@ fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
         G3_OP_INY => Some((Opcodes::INY, AddressModes::Implied)),
         G3_OP_DEX => Some((Opcodes::DEX, AddressModes::Implied)),
         G3_OP_WAI => Some((Opcodes::WAI, AddressModes::Implied)),
-        G3_OP_BNE => Some((Opcodes::BNE, AddressModes::ProgrammCounterRelative)),
+        G3_OP_BNE => Some((Opcodes::BNE, AddressModes::ProgramCounterRelative)),
         G3_OP_PEI => Some((Opcodes::PEI, AddressModes::StackDirectPageIndirect)),
         G3_OP_CLD => Some((Opcodes::CLD, AddressModes::Implied)),
         G3_OP_PHX => Some((Opcodes::PHX, AddressModes::StackPush)),
@@ -255,7 +255,7 @@ fn decode_group_III(opcode: u8) -> Option<(Opcodes, AddressModes)> {
         G3_OP_INX => Some((Opcodes::INX, AddressModes::Implied)),
         G3_OP_NOP => Some((Opcodes::NOP, AddressModes::Implied)),
         G3_OP_XBA => Some((Opcodes::XBA, AddressModes::Implied)),
-        G3_OP_BEQ => Some((Opcodes::BEQ, AddressModes::ProgrammCounterRelative)),
+        G3_OP_BEQ => Some((Opcodes::BEQ, AddressModes::ProgramCounterRelative)),
         G3_OP_PEA => Some((Opcodes::PEA, AddressModes::StackAbsolute)),
         G3_OP_SED => Some((Opcodes::SED, AddressModes::Implied)),
         G3_OP_PLX => Some((Opcodes::PLX, AddressModes::StackPull)),
@@ -446,6 +446,7 @@ impl<'t> Decoder<'t> {
 
         match decoder.bus.get_cartridge() {
             Some(_) => {
+                // Set PC to reset vector
                 decoder.bus.get_cpu().regs.borrow_mut().PC = decoder
                     .bus
                     .get_cartridge()
@@ -468,19 +469,24 @@ impl<'t> Decoder<'t> {
         instruction.execute(self.bus, self.follow_jumps);
     }
 
+    pub fn peek(&mut self) -> Option<Instruction> {
+        let instr = Instruction::new(self);
+        //instr.execute(self.bus, self.follow_jumps);
+        Some(instr)
+    }
+
     /// # Examples
     ///
     /// ```
     /// use superrustendo::cpu::addressmodes::AddressModes;
     ///
     /// use superrustendo::cpu::decoder::{ Decoder, Opcodes};
-    /// use superrustendo::mem::{Bus, WRAM};
+    /// use superrustendo::mem::Bus;
     /// use superrustendo::cpu::{Accumulator, CPU, IndexRegister, Registers, StatusRegister};
     /// use std::convert::TryInto;
     ///
-    /// let mut c = CPU::new();
-    /// let mut m = Bus { cartridge: None, wram: WRAM::new()};
-    /// let d = Decoder::new(&mut c, &mut m, /* follow_jumps */ false);
+    /// let mut m = Bus::new();
+    /// let d = Decoder::new(&mut m, /* follow_jumps */ false);
     /// let result = d.decode(0x3d);
     /// let res = result.unwrap();
     /// let addr = res.1;
@@ -500,7 +506,7 @@ impl<'t> Decoder<'t> {
             // println!("Group I: {:?}", instr);
             return Ok(instr);
         }
-        // This should never happen because everyting between 0x00..=0xff is interpreted
+        // This should never happen because everything between 0x00..=0xff is interpreted
         unreachable!();
     }
 }

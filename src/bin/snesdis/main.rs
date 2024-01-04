@@ -7,9 +7,8 @@ use std::path::Path;
 use superrustendo::cpu::decoder::*;
 use superrustendo::cpu::*;
 use superrustendo::mem::Bus;
-use superrustendo::ppu::PPU;
 use superrustendo::tooling::disassembler::PrintToken;
-use superrustendo::{cartridge::Cartridge, mem::WRAM};
+use superrustendo::{cartridge::Cartridge};
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -24,17 +23,12 @@ fn main() -> std::io::Result<()> {
     let card = Cartridge::load_rom(Path::new(&args[1])).expect("Error loading");
     println!("Loaded Cardidge: {:?}", card.header);
 
-    let mut cpu = CPU::new();
+    let cpu = CPU::new();
 
     // TODO: Fix address offsets => rom mapping starts at 0x8000.. for bank 00
-    let mut bus = Bus {
-        cartridge: Some(card),
-        wram: WRAM::new(),
-        ppu: PPU::new(),
-        cpu,
-    };
+    let mut bus = Bus::new();
 
-    let decoder = Decoder::new(&mut bus.cpu, &mut bus, true);
+    let decoder = Decoder::new(&mut bus, true);
 
     let mut labels = HashMap::new();
     let mut decoded_asm = Vec::new();
@@ -48,7 +42,7 @@ fn main() -> std::io::Result<()> {
     }
 
     println!();
-    println!("Dissassembled code:");
+    println!("Disassembled code:");
 
     println!("Labels:");
     for (k, l) in &labels {

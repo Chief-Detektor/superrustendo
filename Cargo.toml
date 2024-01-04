@@ -11,11 +11,14 @@ crate-type = ["dylib", "rlib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# bitpat = "0.1.1"
 byte_struct = "0.7.1"
 byteorder = "1.4.3"
-# bitpat = "0.1.1"
-raw-string= "0.3.5"
-rustyline="9.0.0"
 hex = "0.4.3"
 minifb = "0.25.0"
+raw-string= "0.3.5"
+rustyline="9.0.0"
+#snes-apu = "0.1.12"
+#cpal = "0.4.4"
+#futures = "0.1.1"
 # bit_field = "0.10.0"

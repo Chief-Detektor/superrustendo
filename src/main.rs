@@ -1,9 +1,10 @@
 #![recursion_limit = "256"]
 
-use std::env;
+use std::{env, thread};
 
 use std::io::{Error, ErrorKind};
 use std::path::Path;
+pub mod apu;
 pub mod cartridge;
 pub mod cpu;
 pub mod mem;
@@ -26,10 +27,9 @@ fn main() -> std::io::Result<()> {
     let card = cartridge::Cartridge::load_rom(Path::new(&args[1])).expect("Error loading");
     println!("Loaded Cardidge: {:?}", card.header);
 
-    // TODO: Fix address offsets => rom mapping starts at 0x8000.. for bank 00
     let mut bus = Bus::new();
-    bus.load_cartridge(card);
 
+    bus.load_cartridge(card);
     let decoder = Decoder::new(&mut bus, true);
 
     for (_i, instr) in decoder.enumerate() {
