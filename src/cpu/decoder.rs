@@ -431,24 +431,24 @@ fn decode_group_I(opcode: u8) -> Option<(Opcodes, AddressModes)> {
 
 // #[derive(Debug)]
 pub struct Decoder<'t> {
-    instructions: Vec<Instruction>,
-    pub bus: &'t mut Bus,
+    //   instructions: Vec<Instruction>,
+    bus: &'t mut Bus,
     follow_jumps: bool,
 }
 
 impl<'t> Decoder<'t> {
     pub fn new(bus: &'t mut Bus, follow_jumps: bool) -> Decoder<'t> {
         let decoder = Decoder {
-            instructions: Vec::new(),
+            //            instructions: Vec::new(),
             bus,
             follow_jumps,
         };
 
-        match decoder.bus.cartridge {
+        match decoder.bus.get_cartridge() {
             Some(_) => {
-                decoder.bus.cpu.regs.borrow_mut().PC = decoder
+                decoder.bus.get_cpu().regs.borrow_mut().PC = decoder
                     .bus
-                    .cartridge
+                    .get_cartridge()
                     .as_ref()
                     .unwrap()
                     .get_emu_reset_vector();
@@ -457,6 +457,10 @@ impl<'t> Decoder<'t> {
         }
 
         decoder
+    }
+
+    pub fn get_bus(&self) -> &Bus {
+        &self.bus
     }
 
     pub fn execute_instruction(&mut self, instruction: &mut Instruction) {
@@ -501,53 +505,13 @@ impl<'t> Decoder<'t> {
     }
 }
 
-// This needs to be on ROM?
+// TODO: Wait for cycle count before next execution
 impl Iterator for Decoder<'_> {
     type Item = Instruction;
 
     fn next(&mut self) -> Option<Instruction> {
-        // TODO: Evaluate this
-        let address = Address {
-            bank: self.bus.cpu.regs.borrow().PBR,
-            address: self.bus.cpu.regs.borrow().PC,
-        };
-        println!("Address: {:x}", address.address);
-        let inst = self
-            .decode(self.bus.read(address).try_into().unwrap())
-            .unwrap();
-
-        println!(
-            "Address: {:x}, Opcode: {:x}",
-            address.address,
-            inst.0.clone() as u8
-        );
-
-        // let payload = self.bus.cartridge.as_ref().unwrap().read_bytes(
-        //     (self.cpu.regs.PC as u32 + 1) as usize, // The payload starts 1 after opcode
-        //     inst.1.len(&self.cpu.regs, &inst.0) - 1, // substract the opcode from length
-        // );
-        let payload = self.bus.read_bytes(
-            address.add(1),
-            inst.1.len(&self.bus.cpu.regs.borrow(), &inst.0) - 1,
-        );
-
-        let mut instr = Instruction::new();
-        instr.address = self.bus.cpu.regs.borrow().PC as _;
-
-        // TODO: Handle Overflow
-
-        let mut new_pc = Wrapping(self.bus.cpu.regs.borrow().PC);
-        // increase Programm Counter
-        new_pc.0 += inst.1.len(&self.bus.cpu.regs.borrow(), &inst.0) as u16;
-        self.bus.cpu.regs.borrow_mut().PC = new_pc.0;
-
-        instr.opcode = inst.0;
-        instr.address_mode = inst.1;
-        instr.payload = payload;
-
-        println!("Executing: {:?}", instr);
-
-        instr.execute(&mut self.bus, self.follow_jumps);
+        let instr = Instruction::new(self);
+        instr.execute(self.bus, self.follow_jumps);
         Some(instr)
     }
 }

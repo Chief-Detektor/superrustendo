@@ -53,10 +53,63 @@ impl Address {
         }
     }
 
+    fn mirror_hirom(&self) -> Address {
+        match self.bank {
+            0x00..=0x1f => {
+                return *self;
+            }
+            0x20..=0x3f => {
+                // Mirroring
+                return Address {
+                    bank: self.bank ^ 0x20,
+                    address: self.address,
+                };
+            }
+            0x40..=0x7d => {
+                return Address {
+                    bank: self.bank ^ 0x40,
+                    address: self.address,
+                };
+            }
+            0x80..=0x9f => {
+                return Address {
+                    bank: self.bank ^ 0x80,
+                    address: self.address,
+                };
+            }
+            0xA0..=0xbf => {
+                return Address {
+                    bank: self.bank ^ 0x80,
+                    address: self.address,
+                }
+                .mirror_hirom();
+            }
+            0xc0..=0xfd => {
+                return Address {
+                    bank: self.bank ^ 0x80,
+                    address: self.address,
+                }
+                .mirror_hirom();
+            }
+            0xfe..=0xff => {
+                return Address {
+                    bank: self.bank ^ 0xc0,
+                    address: self.address,
+                }
+                .mirror_hirom();
+            }
+            _ => {
+                panic!("Invalid bank for rom access");
+                return *self;
+            }
+        }
+    }
+
     pub fn mirror(&self, bus: &Bus) -> Address {
         if let Some(rom_type) = bus.get_rom_type() {
             match rom_type {
                 RomTypes::LowRom => self.mirror_lowrom(),
+                RomTypes::HiRom => self.mirror_hirom(),
                 _ => unimplemented!("Mirror not implemented for rom type {:?}", rom_type),
             }
         } else {

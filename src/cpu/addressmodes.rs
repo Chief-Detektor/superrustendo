@@ -102,7 +102,6 @@ impl AddressModes {
 
     pub fn get_effective_address(
         &self,
-        cpu: &CPU,
         payload: &Vec<u8>,
         opcode: &Opcodes,
         bus: &Bus,
@@ -115,10 +114,10 @@ impl AddressModes {
             AddressModes::Absolute => {
                 if *opcode == Opcodes::JMP || *opcode == Opcodes::JSR {
                     // println!("Transfer control");
-                    address.bank = cpu.regs.borrow().PBR;
+                    address.bank = bus.get_cpu().regs.borrow().PBR;
                 } else {
                     // println!("Datamove");
-                    address.bank = cpu.regs.borrow().DBR;
+                    address.bank = bus.get_cpu().regs.borrow().DBR;
                 }
 
                 let data = payload.as_slice();
@@ -128,59 +127,59 @@ impl AddressModes {
                 return Some(address);
             }
             AddressModes::AbsoluteIndexedX => {
-                address.bank = cpu.regs.borrow().DBR;
-                if cpu.regs.borrow().P.x == 1 {
+                address.bank = bus.get_cpu().regs.borrow().DBR;
+                if bus.get_cpu().regs.borrow().P.x == 1 {
                     if (payload[0] as u32 | (payload[1] as u32) << 8)
-                        + cpu.regs.borrow().X.low as u32
+                        + bus.get_cpu().regs.borrow().X.low as u32
                         > 0xffff
                     {
                         address.bank += 1;
                         address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
-                            .wrapping_add(cpu.regs.borrow().X.low);
+                            .wrapping_add(bus.get_cpu().regs.borrow().X.low);
                     } else {
                         address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
-                            + cpu.regs.borrow().X.low;
+                            + bus.get_cpu().regs.borrow().X.low;
                     }
                 } else {
                     if (payload[0] as u32 | (payload[1] as u32) << 8)
-                        + u16::from(cpu.regs.borrow().X) as u32
+                        + u16::from(bus.get_cpu().regs.borrow().X) as u32
                         > 0xffff
                     {
                         address.bank += 1;
                         address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
-                            .wrapping_add(u16::from(cpu.regs.borrow().X));
+                            .wrapping_add(u16::from(bus.get_cpu().regs.borrow().X));
                     } else {
                         address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
-                            + u16::from(cpu.regs.borrow().X);
+                            + u16::from(bus.get_cpu().regs.borrow().X);
                     }
                 }
                 return Some(address);
             }
             AddressModes::AbsoluteIndexedY => {
-                address.bank = cpu.regs.borrow().DBR;
-                if cpu.regs.borrow().P.x == 1 {
+                address.bank = bus.get_cpu().regs.borrow().DBR;
+                if bus.get_cpu().regs.borrow().P.x == 1 {
                     if (payload[0] as u32 | (payload[1] as u32) << 8)
-                        + cpu.regs.borrow().Y.low as u32
+                        + bus.get_cpu().regs.borrow().Y.low as u32
                         > 0xffff
                     {
                         address.bank += 1;
                         address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
-                            .wrapping_add(cpu.regs.borrow().Y.low);
+                            .wrapping_add(bus.get_cpu().regs.borrow().Y.low);
                     } else {
                         address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
-                            + cpu.regs.borrow().Y.low;
+                            + bus.get_cpu().regs.borrow().Y.low;
                     }
                 } else {
                     if (payload[0] as u32 | (payload[1] as u32) << 8)
-                        + u16::from(cpu.regs.borrow().Y) as u32
+                        + u16::from(bus.get_cpu().regs.borrow().Y) as u32
                         > 0xffff
                     {
                         address.bank += 1;
                         address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
-                            .wrapping_add(u16::from(cpu.regs.borrow().Y));
+                            .wrapping_add(u16::from(bus.get_cpu().regs.borrow().Y));
                     } else {
                         address.address = (payload[0] as u16 | (payload[1] as u16) << 8)
-                            + u16::from(cpu.regs.borrow().Y);
+                            + u16::from(bus.get_cpu().regs.borrow().Y);
                     }
                 }
                 return Some(address);
@@ -192,10 +191,10 @@ impl AddressModes {
                 let mut addr = (data[1] as u16) << 8 | data[0] as u16;
 
                 // TODO: Wrapping? => Bank change?
-                if cpu.regs.borrow().P.x == 0 {
-                    addr = addr.wrapping_add(u16::from(cpu.regs.borrow().X));
+                if bus.get_cpu().regs.borrow().P.x == 0 {
+                    addr = addr.wrapping_add(u16::from(bus.get_cpu().regs.borrow().X));
                 } else {
-                    addr = addr.wrapping_add(cpu.regs.borrow().X.get_low() as u16);
+                    addr = addr.wrapping_add(bus.get_cpu().regs.borrow().X.get_low() as u16);
                 }
 
                 address.bank = bank;
@@ -207,26 +206,26 @@ impl AddressModes {
                 let op_high = payload[1];
 
                 let x;
-                if cpu.regs.borrow().P.x == 1 || cpu.e {
-                    x = cpu.regs.borrow().X.low;
+                if bus.get_cpu().regs.borrow().P.x == 1 || bus.get_cpu().get_emulation_mode() {
+                    x = bus.get_cpu().regs.borrow().X.low;
                 } else {
-                    x = u16::from(cpu.regs.borrow().X);
+                    x = u16::from(bus.get_cpu().regs.borrow().X);
                 }
                 // TODO: increment bank on overflow like AbsoluteIndexed/XY?
                 let mut indirect_address = op_low as u16 | (op_high as u16) << 8;
                 // indirect_address += x;
                 if indirect_address as u32 + x as u32 > 0xffff {
-                    address.bank = cpu.regs.borrow().PBR /*+ 1*/;
+                    address.bank = bus.get_cpu().regs.borrow().PBR /*+ 1*/;
                     indirect_address = indirect_address.wrapping_add(x);
                 } else {
-                    address.bank = cpu.regs.borrow().PBR;
+                    address.bank = bus.get_cpu().regs.borrow().PBR;
                     indirect_address += x;
                 }
 
                 let addresss_low = bus.read(address);
                 let addresss_high = bus.read(address.add(1));
 
-                // cpu.regs.PC = (cpu.regs.borrow().PBR as u32) << 16 | (addresss_high as u32) << 8 | addresss_low as u32;
+                // bus.get_cpu().regs.borrow().PC = (bus.get_cpu().regs.borrow().PBR as u32) << 16 | (addresss_high as u32) << 8 | addresss_low as u32;
                 address.address = (addresss_high as u16) << 8 | addresss_low as u16;
                 return Some(address);
             }
@@ -238,13 +237,14 @@ impl AddressModes {
                 return Some(address);
             }
             AddressModes::Implied => {
-                println!("Implied addressing");
+                //println!("Implied addressing");
                 return None;
             }
             AddressModes::Immediate => {
-                println!("Immediate addressing");
-                if !cpu.e
-                    && (cpu.regs.borrow().P.m == 0 || cpu.regs.borrow().P.x == 0)
+                //println!("Immediate addressing");
+                if !bus.get_cpu().get_emulation_mode()
+                    && (bus.get_cpu().regs.borrow().P.m == 0
+                        || bus.get_cpu().regs.borrow().P.x == 0)
                     && payload.capacity() == 2
                 {
                     address.address = payload[0] as u16 | (payload[1] as u16) << 8;
@@ -256,36 +256,36 @@ impl AddressModes {
             AddressModes::ProgrammCounterRelative => {
                 let offset: i8 = payload[0] as _;
                 let foo = offset as i16;
-                address.address = (foo as i32 + (cpu.regs.borrow().PC as i32))
+                address.address = (foo as i32 + (bus.get_cpu().regs.borrow().PC as i32))
                     .try_into()
                     .unwrap();
-                address.bank = cpu.regs.borrow().PBR;
-                // return (((cpu.regs.borrow().PBR as u32) << 16) | address) as usize;
+                address.bank = bus.get_cpu().regs.borrow().PBR;
+                // return (((bus.get_cpu().regs.borrow().PBR as u32) << 16) | address) as usize;
                 return Some(address);
             }
             AddressModes::ProgrammCounterRelativeLong => {
                 let offset = payload[0] as u16 | (payload[1] as u16) << 8;
                 let sign_offest = offset as i16;
-                address.address = (sign_offest as i32 + (cpu.regs.borrow().PC as i32))
+                address.address = (sign_offest as i32 + (bus.get_cpu().regs.borrow().PC as i32))
                     .try_into()
                     .unwrap();
-                address.bank = cpu.regs.borrow().PBR;
-                // return (((cpu.regs.borrow().PBR as u32) << 16) | address) as usize;
+                address.bank = bus.get_cpu().regs.borrow().PBR;
+                // return (((bus.get_cpu().regs.borrow().PBR as u32) << 16) | address) as usize;
                 return Some(address);
             }
             AddressModes::StackPCRelativeLong => {
                 let op_low = payload[0];
-                let address = cpu.regs.borrow().PC + op_low as u16;
-                cpu.stack_push((address & 0x00ff) as u8);
-                cpu.stack_push(((address & 0xff00) >> 8) as u8);
+                let address = bus.get_cpu().regs.borrow().PC + op_low as u16;
+                bus.get_cpu().stack_push((address & 0x00ff) as u8);
+                bus.get_cpu().stack_push(((address & 0xff00) >> 8) as u8);
             }
             AddressModes::StackRelative => {
-                address.address = payload[0] as u16 + u16::from(cpu.regs.borrow().S);
+                address.address = payload[0] as u16 + u16::from(bus.get_cpu().regs.borrow().S);
                 address.bank = 0;
                 return Some(address);
             }
             AddressModes::StackRelativeIndirectIndexedY => {
-                let val = payload[0] as u16 + u16::from(cpu.regs.borrow().S);
+                let val = payload[0] as u16 + u16::from(bus.get_cpu().regs.borrow().S);
                 let mut addr = bus.read(Address {
                     address: val,
                     bank: 0,
@@ -298,31 +298,32 @@ impl AddressModes {
                         .add(1),
                     ) as u16)
                         << 8;
-                if cpu.e || cpu.regs.borrow().P.x == 1 {
-                    addr += cpu.regs.borrow().Y.low;
+                if bus.get_cpu().get_emulation_mode() || bus.get_cpu().regs.borrow().P.x == 1 {
+                    addr += bus.get_cpu().regs.borrow().Y.low;
                 } else {
-                    addr += u16::from(cpu.regs.borrow().Y);
+                    addr += u16::from(bus.get_cpu().regs.borrow().Y);
                 }
                 address.address = addr;
-                address.bank = cpu.regs.borrow().DBR;
+                address.bank = bus.get_cpu().regs.borrow().DBR;
                 return Some(address);
             }
             AddressModes::StackInterrupt => {
-                if !cpu.e {
-                    cpu.stack_push(cpu.regs.borrow().PBR);
+                if !bus.get_cpu().get_emulation_mode() {
+                    bus.get_cpu().stack_push(bus.get_cpu().regs.borrow().PBR);
                 }
-                let pc_high = (cpu.regs.borrow().PC >> 8) as u8;
-                let pc_low = (cpu.regs.borrow().PC & 0xff) as u8;
-                cpu.stack_push(pc_high);
-                cpu.stack_push(pc_low);
-                cpu.stack_push(cpu.regs.borrow().P.into());
+                let pc_high = (bus.get_cpu().regs.borrow().PC >> 8) as u8;
+                let pc_low = (bus.get_cpu().regs.borrow().PC & 0xff) as u8;
+                bus.get_cpu().stack_push(pc_high);
+                bus.get_cpu().stack_push(pc_low);
+                bus.get_cpu()
+                    .stack_push(bus.get_cpu().regs.borrow().P.into());
 
                 // TODO: Eval this
                 let interrupt_vector;
-                if !cpu.e {
-                    interrupt_vector = bus.cartridge.as_ref().unwrap().header.native_irq;
+                if !bus.get_cpu().get_emulation_mode() {
+                    interrupt_vector = bus.get_cartridge().as_ref().unwrap().header.native_irq;
                 } else {
-                    interrupt_vector = bus.cartridge.as_ref().unwrap().header.emu_irq;
+                    interrupt_vector = bus.get_cartridge().as_ref().unwrap().header.emu_irq;
                 }
                 let load_address = Address {
                     bank: 0,
@@ -342,11 +343,11 @@ impl AddressModes {
             AddressModes::StackPull => {}
             AddressModes::StackAbsolute => {}
             AddressModes::DirectPage => {
-                address.address = u16::from(cpu.regs.borrow().D) + payload[0] as u16;
+                address.address = u16::from(bus.get_cpu().regs.borrow().D) + payload[0] as u16;
                 return Some(address);
             }
             AddressModes::DirectPageIndirect => {
-                let val = payload[0] as u16 + cpu.regs.borrow().D;
+                let val = payload[0] as u16 + bus.get_cpu().regs.borrow().D;
                 let addr_low = bus.read(Address {
                     bank: 0,
                     address: val,
@@ -359,12 +360,12 @@ impl AddressModes {
                     .add(1),
                 );
 
-                address.bank = cpu.regs.borrow().DBR;
+                address.bank = bus.get_cpu().regs.borrow().DBR;
                 address.address = addr_low as u16 | (addr_high as u16) << 8;
                 return Some(address);
             }
             AddressModes::DirectPageIndirectLong => {
-                let val = payload[0] as u16 + cpu.regs.borrow().D;
+                let val = payload[0] as u16 + bus.get_cpu().regs.borrow().D;
                 let addr_low = bus.read(Address {
                     bank: 0,
                     address: val,
@@ -388,9 +389,9 @@ impl AddressModes {
                 return Some(address);
             }
             AddressModes::DirectPageIndirectIndexedY => {
-                if cpu.e || cpu.regs.borrow().P.x == 1 {
+                if bus.get_cpu().get_emulation_mode() || bus.get_cpu().regs.borrow().P.x == 1 {
                     let val;
-                    val = cpu.regs.borrow().D + payload[0] as u16;
+                    val = bus.get_cpu().regs.borrow().D + payload[0] as u16;
                     address.address = (bus.read(Address {
                         bank: 0,
                         address: val,
@@ -403,11 +404,11 @@ impl AddressModes {
                             .add(1),
                         ) as u16)
                             << 8)
-                        + cpu.regs.borrow().Y.low as u16;
-                    address.bank = cpu.regs.borrow().DBR;
+                        + bus.get_cpu().regs.borrow().Y.low as u16;
+                    address.bank = bus.get_cpu().regs.borrow().DBR;
                 } else {
                     let val;
-                    val = cpu.regs.borrow().D + payload[0] as u16;
+                    val = bus.get_cpu().regs.borrow().D + payload[0] as u16;
                     address.address = (bus.read(Address {
                         bank: 0,
                         address: val,
@@ -420,13 +421,13 @@ impl AddressModes {
                             .add(1),
                         ) as u16)
                             << 8)
-                        + u16::from(cpu.regs.borrow().Y);
-                    address.bank = cpu.regs.borrow().DBR;
+                        + u16::from(bus.get_cpu().regs.borrow().Y);
+                    address.bank = bus.get_cpu().regs.borrow().DBR;
                 }
                 return Some(address);
             }
             AddressModes::DirectPageIndirectLongIndexedY => {
-                let indirect = cpu.regs.borrow().D + payload[0] as u16;
+                let indirect = bus.get_cpu().regs.borrow().D + payload[0] as u16;
                 let addr_low = bus.read(Address {
                     address: indirect,
                     bank: 0,
@@ -440,10 +441,10 @@ impl AddressModes {
                     bank: 0,
                 });
                 let index;
-                if cpu.e || cpu.regs.borrow().P.x == 1 {
-                    index = cpu.regs.borrow().Y.low;
+                if bus.get_cpu().get_emulation_mode() || bus.get_cpu().regs.borrow().P.x == 1 {
+                    index = bus.get_cpu().regs.borrow().Y.low;
                 } else {
-                    index = u16::from(cpu.regs.borrow().Y);
+                    index = u16::from(bus.get_cpu().regs.borrow().Y);
                 }
                 address.address = (addr_low as u16 | (addr_high as u16) << 8).wrapping_add(index);
                 address.bank = addr_bank;
@@ -451,29 +452,31 @@ impl AddressModes {
             }
             AddressModes::DirectPageIndexedX => {
                 let addr;
-                if cpu.e || cpu.regs.borrow().P.x == 1 {
+                if bus.get_cpu().get_emulation_mode() || bus.get_cpu().regs.borrow().P.x == 1 {
                     let D;
-                    if cpu.e {
+                    if bus.get_cpu().get_emulation_mode() {
                         D = 0;
                     } else {
-                        D = cpu.regs.borrow().D;
+                        D = bus.get_cpu().regs.borrow().D;
                     }
-                    addr = payload[0] as u16 + D + cpu.regs.borrow().X.low;
+                    addr = payload[0] as u16 + D + bus.get_cpu().regs.borrow().X.low;
                 } else {
-                    addr = payload[0] as u16 + cpu.regs.borrow().D + u16::from(cpu.regs.borrow().X);
+                    addr = payload[0] as u16
+                        + bus.get_cpu().regs.borrow().D
+                        + u16::from(bus.get_cpu().regs.borrow().X);
                 }
                 address.address = addr;
                 address.bank = 0;
                 return Some(address);
             }
             AddressModes::DirectPageIndexedIndirectX => {
-                if cpu.e || cpu.regs.borrow().P.x == 1 {
+                if bus.get_cpu().get_emulation_mode() || bus.get_cpu().regs.borrow().P.x == 1 {
                     let mut val;
                     // is it 0 in emu mode??
                     val = 0u8;
-                    // val = cpu.regs.borrow().D;
+                    // val = bus.get_cpu().regs.borrow().D;
                     val += val
-                        .wrapping_add(cpu.regs.borrow().X.low as u8)
+                        .wrapping_add(bus.get_cpu().regs.borrow().X.low as u8)
                         .wrapping_add(payload[0]);
                     let _indirect = bus.read(Address {
                         bank: 0,
@@ -487,11 +490,11 @@ impl AddressModes {
                             .add(1),
                         ) as u16)
                             << 8;
-                    address.bank = cpu.regs.borrow().DBR;
+                    address.bank = bus.get_cpu().regs.borrow().DBR;
                 } else {
                     let mut val;
-                    val = cpu.regs.borrow().D;
-                    val += u16::from(cpu.regs.borrow().X) + payload[0] as u16;
+                    val = bus.get_cpu().regs.borrow().D;
+                    val += u16::from(bus.get_cpu().regs.borrow().X) + payload[0] as u16;
                     address.address = bus.read(Address {
                         bank: 0,
                         address: val,
@@ -504,14 +507,16 @@ impl AddressModes {
                             .add(1),
                         ) as u16)
                             << 8;
-                    address.bank = cpu.regs.borrow().DBR;
+                    address.bank = bus.get_cpu().regs.borrow().DBR;
                 }
                 return Some(address);
             }
             AddressModes::BlockMove => {
                 println!(
                     "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
-                    self, opcode, cpu.regs
+                    self,
+                    opcode,
+                    bus.get_cpu().regs.borrow()
                 );
             }
             _ => {
@@ -519,7 +524,7 @@ impl AddressModes {
                     "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
                     self,
                     opcode,
-                    cpu.regs
+                    bus.get_cpu().regs.borrow()
                 );
             }
         };

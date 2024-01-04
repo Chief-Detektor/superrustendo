@@ -359,24 +359,44 @@ impl Registers {
         self
     }
     // Getters
-    pub fn get_P(&mut self) -> &mut StatusRegister {
-        return &mut self.P;
+    pub fn get_P(&self) -> &StatusRegister {
+        return &self.P;
     }
-    pub fn get_C(&mut self) -> &mut Accumulator {
-        return &mut self.C;
+    pub fn get_C(&self) -> &Accumulator {
+        return &self.C;
     }
-    pub fn get_X(&mut self) -> &mut IndexRegister {
-        return &mut self.X;
+    pub fn get_X(&self) -> &IndexRegister {
+        return &self.X;
     }
-    pub fn get_Y(&mut self) -> &mut IndexRegister {
-        return &mut self.Y;
+    pub fn get_Y(&self) -> &IndexRegister {
+        return &self.Y;
     }
     pub fn get_D(&self) -> u16 {
         return self.D;
     }
-    pub fn get_S(&mut self) -> &mut IndexRegister {
+    pub fn get_S(&self) -> &IndexRegister {
+        return &self.S;
+    }
+
+    pub fn get_P_mut(&mut self) -> &mut StatusRegister {
+        return &mut self.P;
+    }
+    pub fn get_C_mut(&mut self) -> &mut Accumulator {
+        return &mut self.C;
+    }
+    pub fn get_X_mut(&mut self) -> &mut IndexRegister {
+        return &mut self.X;
+    }
+    pub fn get_Y_mut(&mut self) -> &mut IndexRegister {
+        return &mut self.Y;
+    }
+    pub fn get_D_mut(&self) -> u16 {
+        return self.D;
+    }
+    pub fn get_S_mut(&mut self) -> &mut IndexRegister {
         return &mut self.S;
     }
+
     pub fn get_PBR(&self) -> u8 {
         return self.PBR;
     }
@@ -390,9 +410,9 @@ impl Registers {
 
 #[derive(Debug)]
 pub struct CPU {
-    regs: Rc<RefCell<Registers>>,
-    stack: Rc<RefCell<Stack>>,
-    e: bool, // Emulation mode
+    regs: RefCell<Registers>,
+    stack: RefCell<Stack>,
+    e: RefCell<bool>, // Emulation mode
 }
 
 impl Default for Registers {
@@ -414,34 +434,39 @@ impl Default for Registers {
 impl CPU {
     pub fn new() -> CPU {
         CPU {
-            regs: Rc::new(RefCell::new(Registers::default())),
-            stack: Rc::new(RefCell::new(Stack::default())),
-            e: true,
+            regs: RefCell::new(Registers::default()),
+            stack: RefCell::new(Stack::default()),
+            e: RefCell::new(true),
         }
     }
     pub fn is_16_bit_mem_and_accu(&self) -> bool {
-        !self.e && self.regs.borrow().P.m != 1
+        !*self.e.borrow() && self.regs.borrow().P.m != 1
     }
     pub fn is_16_bit_index(&self) -> bool {
-        !self.e && self.regs.borrow().P.x != 1
+        !*self.e.borrow() && self.regs.borrow().P.x != 1
     }
-    pub fn get_regs(&self) -> Registers {
-        return *self.regs.borrow_mut();
-    }
+
+    //    pub fn get_stack(&self) -> &Stack {
+    //        return &self.stack;
+    //    }
+
+    //    pub fn get_regs(&self) -> &Registers {
+    //        return &self.regs;
+    //    }
 
     pub fn get_emulation_mode(&self) -> bool {
-        return self.e;
+        return *self.e.borrow();
     }
-    pub fn set_regs(&self, regs: &Registers) {
-        *self.regs.borrow_mut() = *regs;
-    }
+    //    pub fn set_regs(&mut self, regs: &Registers) {
+    //        self.regs = *regs;
+    //    }
 
-    pub fn set_emulation_mode(&mut self, e: bool) {
-        self.e = e;
+    pub fn set_emulation_mode(&self, e: bool) {
+        *self.e.borrow_mut() = e;
     }
 
     pub fn stack_push(&self, payload: u8) {
-        let index = <u16>::from(self.regs.borrow().S);
+        let index = <u16>::from(*self.regs.borrow().get_S());
         println!("Pushing {:x} on stack address {:x}", payload, index);
 
         let mut new_index: i32 = index as i32 - 1;
@@ -450,18 +475,22 @@ impl CPU {
             new_index = 0xffff
         }
         self.stack.borrow_mut().content[(new_index) as usize] = payload;
-        self.regs.borrow_mut().S = IndexRegister::from(new_index as u16);
+        self.regs
+            .borrow_mut()
+            .set_S(&IndexRegister::from(new_index as u16));
     }
 
     pub fn stack_pull(&self) -> u8 {
-        let index = <u16>::from(self.regs.borrow().S);
+        let index = <u16>::from(*self.regs.borrow().get_S());
         let ret = self.stack.borrow().content[index as usize];
 
         let mut new_index: i32 = index as i32 + 1;
         if new_index == 0x10000 {
             new_index = 0;
         }
-        self.regs.borrow_mut().S = IndexRegister::from(new_index as u16);
+        self.regs
+            .borrow_mut()
+            .set_S(&IndexRegister::from(new_index as u16));
         println!("Popping {:x} from Stack", ret);
         ret
     }

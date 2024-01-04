@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 
 use crate::cartridge::{Cartridge, RomTypes};
@@ -6,155 +6,21 @@ use crate::cpu::address::{self, Address};
 use crate::cpu::CPU;
 use crate::ppu::PPU;
 
-pub struct WRAM {
-    lowRam: [u8; 0x2000],  // bank: 0x0-3f (shadowed from 0x7e) 0x0000-0x1fff
-    highRam: [u8; 0x6000], // 0x7e
-    extendedRam: [u8; 0x10000],
-    //    extendedRam_2: [u8; 0x10000],
-}
+use self::wram::WRAM;
 
-impl WRAM {
-    pub fn new() -> Self {
-        WRAM {
-            lowRam: [0xf; 0x2000],
-            highRam: [0; 0x6000],
-            extendedRam: [0; 0x10000],
-            //            extendedRam_2: [0; 0x10000],
-        }
-    }
-    pub fn is_wram(address: Address) -> bool {
-        match address.bank {
-            0x00..=0x3f => match address.address {
-                0x0000..=0x1fff => {
-                    return true;
-                }
-                _ => {
-                    return false;
-                }
-            },
-            0x7e => {
-                match address.address {
-                    0x0000..=0x1fff => {
-                        return true;
-                    }
-                    0x2000..=0x7fff => {
-                        // This xor is needed otherwise access would exceed the memory (highRam
-                        // size is 0x6000
-                        return true;
-                    }
-                    0x8000..=0xffff => {
-                        return true;
-                    }
-                }
-            }
-            0x7f => return true,
-            0x80..=0xbf => match address.address {
-                0x0000..=0x1fff => {
-                    return true;
-                }
-                _ => {
-                    return false;
-                }
-            },
-            _ => {
-                return false;
-            }
-        }
-    }
+use hw_registers::HWRegister;
 
-    fn write(&mut self, address: Address, byte: u8) {
-        match address.bank {
-            0x00..=0x3f => match address.address {
-                0x0000..=0x1fff => {
-                    self.lowRam[address.address as usize] = byte;
-                }
-                _ => {}
-            },
-            0x7e => {
-                match address.address {
-                    0x0000..=0x1fff => {
-                        self.lowRam[address.address as usize] = byte;
-                    }
-                    0x2000..=0x7fff => {
-                        // This xor is needed otherwise access would exceed the memory (highRam
-                        // size is 0x6000
-                        self.highRam[(address.address - 0x2000) as usize] = byte;
-                    }
-                    0x8000..=0xffff => {
-                        self.extendedRam[(address.address) as usize] = byte;
-                    }
-                }
-            }
-            0x7f => {
-                self.extendedRam[address.address as usize] = byte;
-            }
-            0x80..=0xbf => match address.address {
-                0x0000..=0x1fff => {
-                    self.lowRam[address.address as usize] = byte;
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-    }
+pub mod wram;
 
-    fn read(&self, address: Address) -> Option<u8> {
-        match address.bank {
-            0x00..=0x3f => match address.address {
-                0x0000..=0x1fff => {
-                    return Some(self.lowRam[address.address as usize]);
-                }
-                _ => {
-                    return None;
-                }
-            },
-            0x7e => {
-                match address.address {
-                    0x0000..=0x1fff => {
-                        return Some(self.lowRam[address.address as usize]);
-                    }
-                    0x2000..=0x7fff => {
-                        // This xor is needed otherwise access would exceed the memory (highRam
-                        // size is 0x6000
-                        // substract the offset from the address
-                        return Some(self.highRam[(address.address - 0x2000) as usize]);
-                    }
-                    0x8000..=0xffff => {
-                        // TODO: is (address ^ 0x8000) needed here?
-                        // I assume not because the address is already mapped to 0x8000..0xffff
-                        return Some(self.extendedRam[(address.address) as usize]);
-                    }
-                }
-            }
-            0x7f => return Some(self.extendedRam[address.address as usize]),
-            0x80..=0xbf => match address.address {
-                0x0000..=0x1fff => {
-                    return Some(self.lowRam[address.address as usize]);
-                }
-                _ => {
-                    return None;
-                }
-            },
-            _ => {
-                return None;
-            }
-        }
-    }
-}
-/*
-
-LowRom = Address % 8000 + 8000 * Bank ( + mirror testing)
-
-
-*/
+pub mod hw_registers;
 
 //#[derive(Debug)]
 pub struct Bus {
-    pub cartridge: Option<Cartridge>,
-    pub wram: Rc<RefCell<WRAM>>,
-    pub ppu: PPU,
-    pub cpu: CPU,
-    pub mdr: Rc<RefCell<u8>>,
+    cartridge: Option<Cartridge>,
+    wram: Rc<RefCell<WRAM>>,
+    ppu: PPU,
+    cpu: CPU,
+    mdr: RefCell<u8>,
 }
 
 impl Bus {
@@ -164,8 +30,28 @@ impl Bus {
             wram: Rc::new(RefCell::new(WRAM::new())),
             ppu: PPU::new(),
             cpu: CPU::new(),
-            mdr: Rc::new(RefCell::new(0)),
+            mdr: RefCell::new(0),
         }
+    }
+
+    pub fn get_cartridge(&self) -> &Option<Cartridge> {
+        &self.cartridge
+    }
+
+    pub fn get_cpu(&self) -> &CPU {
+        &self.cpu
+    }
+
+    pub fn get_ppu(&self) -> &PPU {
+        &self.ppu
+    }
+
+    //    pub fn get_wram(&self) -> &WRAM {
+    //        &self.wram
+    //    }
+
+    pub fn get_mdr(&self) -> u8 {
+        *self.mdr.borrow()
     }
 
     pub fn set_mdr(&self, byte: u8) {
@@ -183,6 +69,7 @@ impl Bus {
         }
     }
 
+    // TODO: put this on the cartridge type
     fn resolve_rom_address(&self, address: Address) -> Option<Address> {
         // TODO: Count cycles for rom access
         // TODO: Hardware registers
@@ -202,69 +89,13 @@ impl Bus {
                 // TODO: Fix that stuff
                 let bank = address.bank;
                 let offset = address.address;
-                let mirror = bank % 0x80;
-                let bank = bank - mirror;
-                let address2: u32 = bank as u32 * 0x8000 + offset as u32;
-                println!("Address: {:x}, Resolved: {:x}", address.address, address2);
+
+                let address2: u32 = (bank as u32) << 16 | offset as u32;
+                //                println!("Address: {:x}, Resolved: {:x}", address.address, address2);
                 // TODO: Mirroring
-                return Some(Address::new(address2));
+                return Some(Address::new(address2).mirror(self));
             }
             _ => panic!("Unsupported rom type"),
-        }
-    }
-
-    fn is_wram(&self, address: Address) -> bool {
-        match address.bank {
-            0x00..=0x3f => match address.address {
-                0x0000..=0x1fff => {
-                    return true;
-                }
-                _ => {
-                    return false;
-                }
-            },
-            0x7e => {
-                match address.address {
-                    0x0000..=0x1fff => {
-                        return true;
-                    }
-                    0x2000..=0x7fff => {
-                        // This xor is needed otherwise access would exceed the memory (highRam
-                        // size is 0x6000
-                        return true;
-                    }
-                    0x8000..=0xffff => {
-                        return true;
-                    }
-                }
-            }
-            0x7f => return true,
-            0x80..=0xbf => match address.address {
-                0x0000..=0x1fff => {
-                    return true;
-                }
-                _ => {
-                    return false;
-                }
-            },
-            _ => {
-                return false;
-            }
-        }
-    }
-
-    fn write_wram(&self, address: Address, byte: u8) {
-        println!("[WRAM WRITE] Bank: {:x} Address: {:x} Value: {:x}", address.bank, address.address, byte);
-        self.wram.borrow_mut().write(address, byte);
-    }
-
-    fn read_wram(&self, address: Address) -> Option<u8> {
-        print!("[WRAM READ] Bank: {:x} Address: {:x}", address.bank, address.address);
-        if let Some(byte) = self.wram.borrow().read(address) {
-            print!(" {:x}\n", byte);
-            return Some(byte);
-        } else {
-            return None;
         }
     }
 
@@ -276,14 +107,12 @@ impl Bus {
             "[BUS Read] Bank {:x}, Address: {:x}",
             address.bank, address.address
         );
-        if WRAM::is_wram(address) {
-            if let Some(byte) = self.read_wram(address) {
-                self.set_mdr(byte);
-                return byte;
-            } else {
-                return self.mdr.borrow().clone();
-            }
+
+        if let Some(val) = HWRegister::dispatch_read(self, address) {
+            self.set_mdr(val);
+            return val;
         }
+
         if let Some(address) = self.resolve_rom_address(address) {
             let ret = self.cartridge.as_ref().unwrap().read_byte(address.into());
             self.set_mdr(ret);
@@ -300,16 +129,16 @@ impl Bus {
         }
         bytes
     }
+
     // Write a single byte to the bus
+    // TODO: Write to mdr as well?
     pub fn write(&self, address: Address, value: u8) {
-        if WRAM::is_wram(address) {
-            self.write_wram(address, value);
-            return;
-        }
+        HWRegister::dispatch_write(self, address, value);
+
         println!(
             "[BUS Write] {:x}, to Bank {:x}, Address: {:x}",
             value, address.bank, address.address
         );
-        unimplemented!("Bus write not implemented");
+        //        unimplemented!("Bus write not implemented");
     }
 }

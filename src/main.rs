@@ -1,8 +1,5 @@
 #![recursion_limit = "256"]
 
-use crate::mem::WRAM;
-use crate::ppu::PPU;
-
 use std::env;
 
 use std::io::{Error, ErrorKind};
@@ -14,7 +11,6 @@ pub mod ppu;
 pub mod tooling;
 
 use crate::cpu::decoder::*;
-use crate::cpu::*;
 use crate::mem::Bus;
 
 fn main() -> std::io::Result<()> {

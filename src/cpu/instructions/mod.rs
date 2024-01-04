@@ -4,8 +4,10 @@ use crate::cpu::CPU;
 // use crate::cpu::
 use crate::cpu::{Accumulator, IndexRegister, StatusRegister};
 use crate::mem::Bus;
+use std::num::Wrapping;
 
 use super::address::Address;
+use super::decoder::Decoder;
 
 #[derive(Debug, Default, Clone)]
 pub struct Instruction {
@@ -37,32 +39,65 @@ impl Operant_Value {
 }
 
 //fn is_16_bit_mem_and_accu(cpu: &CPU) -> bool {
-//    !cpu.e && cpu.regs.borrow().P.m != 1
+//    !cpu.e && cpu.borrow().regs.borrow()P.m != 1
 //}
 //fn is_16_bit_index(cpu: &CPU) -> bool {
-//    !cpu.e && cpu.regs.borrow().P.x != 1
+//    !cpu.e && cpu.borrow().regs.borrow()P.x != 1
 //}
 
 impl Instruction {
-    pub fn new() -> Instruction {
-        let inst = Instruction::default();
-        inst
+    pub fn new(decoder: &mut Decoder) -> Instruction {
+        let address = Address {
+            bank: decoder.get_bus().get_cpu().regs.borrow().PBR,
+            address: decoder.get_bus().get_cpu().regs.borrow().PC,
+        };
+        let inst = decoder
+            .decode(decoder.get_bus().read(address).try_into().unwrap())
+            .unwrap();
+
+        let payload = decoder.get_bus().read_bytes(
+            address.add(1),
+            inst.1
+                .len(&decoder.get_bus().get_cpu().regs.borrow(), &inst.0)
+                - 1,
+        );
+
+        let mut new_pc = Wrapping(decoder.get_bus().get_cpu().regs.borrow().PC);
+        // increase Programm Counter
+        new_pc.0 += inst
+            .1
+            .len(&decoder.get_bus().get_cpu().regs.borrow(), &inst.0) as u16;
+
+        decoder.get_bus().get_cpu().regs.borrow_mut().PC = new_pc.0;
+
+        Instruction {
+            address: address.address as u32,
+            opcode: inst.0.clone(),
+            address_mode: inst.1.clone(),
+            length: inst
+                .1
+                .len(&decoder.get_bus().get_cpu().regs.borrow(), &inst.0)
+                + 1,
+            payload,
+            // TODO: Properly calculate cycles
+            cycles: 0,
+        }
     }
 
-    pub fn load_value(&self, bus: &Bus) -> Option<Operant_Value> {
+    fn load_value(&self, bus: &Bus) -> Option<Operant_Value> {
         // if self.address_mode == AddressModes::Immediate {
-        //     if is_16_bit_mem_and_accu(bus.cpu) && self.address_mode.len(regs, &self.opcode) > 3 {
+        //     if is_16_bit_mem_and_accu(bus.get_cpu(). && self.address_mode.len(regs, &self.opcode) > 3 {
         //         return Some(Operant_Value::long(self.payload[0] as u16 | (self.payload[1] as u16) << 8));
         //     } else {
         //         return Some(Operant_Value::short(self.payload[0]));
         //     }
         // } else {
         // get address
-        let address =
-            self.address_mode
-                .get_effective_address(&bus.cpu, &self.payload, &self.opcode, bus);
+        let address = self
+            .address_mode
+            .get_effective_address(&self.payload, &self.opcode, bus);
         if address.is_some() {
-            if !&bus.cpu.is_16_bit_mem_and_accu() {
+            if !&bus.get_cpu().is_16_bit_mem_and_accu() {
                 let val = bus.read(address.unwrap());
                 return Some(Operant_Value::short(val));
             } else {
@@ -81,15 +116,15 @@ impl Instruction {
     // 2. Is addressing mode immediate?
     // - if yes then payload is value
     // - if not then load value from address and save it to value
-    pub fn execute(&mut self, bus: &mut Bus, follow_jumps: bool) {
+    pub fn execute(&self, bus: &mut Bus, follow_jumps: bool) {
         // if this is None it's implied addressing
         let value;
         if self.address_mode != AddressModes::Immediate {
             value = self.load_value(bus);
         } else {
-            let address =
-                self.address_mode
-                    .get_effective_address(&bus.cpu, &self.payload, &self.opcode, bus);
+            let address = self
+                .address_mode
+                .get_effective_address(&self.payload, &self.opcode, bus);
 
             if let Some(a) = address {
                 print!("{:?}", <u16>::from(a));
@@ -102,36 +137,37 @@ impl Instruction {
 
         let effective_address =
             self.address_mode
-                .get_effective_address(&bus.cpu, &self.payload, &self.opcode, bus);
+                .get_effective_address(&self.payload, &self.opcode, bus);
 
-        let is_16_bit_mem_and_accu = bus.cpu.is_16_bit_mem_and_accu();
-        let is_16_bit_index_register = bus.cpu.is_16_bit_index();
-        //        let regs = bus.cpu.regs.borrow();
+        let is_16_bit_mem_and_accu = bus.get_cpu().is_16_bit_mem_and_accu();
+        let is_16_bit_index_register = bus.get_cpu().is_16_bit_index();
+        //        let regs = bus.get_cpu().regs.borrow();
 
         match &self.opcode {
-            // TODO: handle immediate addressing early in such a way that the folloing patterns use it transparently/agnistically
+            // TODO: handle immediate addressing early in such a way that the following patterns use it transparently/agnostically
             Opcodes::AND => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 // TODO: This needs to become a function returning an enum having either a 8 or 16 bit value
                 match value.unwrap() {
                     Operant_Value::short(val) => {
-                        regs.C = Accumulator::from((bus.cpu.regs.borrow().C.A as u8 & val) as u16);
-                        if u16::from(regs.C) >> 8 == 1 {
+                        regs.C =
+                            Accumulator::from((bus.get_cpu().regs.borrow().C.A as u8 & val) as u16);
+                        if u16::from(regs.C.clone()) >> 8 == 1 {
                             regs.P.n = 1;
                         } else {
                             regs.P.n = 0;
                         }
                     }
                     Operant_Value::long(val) => {
-                        regs.C = Accumulator::from(u16::from(bus.cpu.regs.borrow().C) & val as u16);
-                        if u16::from(regs.C) >> 15 == 1 {
+                        regs.C = Accumulator::from(u16::from(regs.C.clone()) & val as u16);
+                        if u16::from(regs.C.clone()) >> 15 == 1 {
                             regs.P.n = 1;
                         } else {
                             regs.P.n = 0;
                         }
                     }
                 }
-                if u16::from(regs.C) == 0 {
+                if u16::from(regs.C.clone()) == 0 {
                     regs.P.z = 1;
                 } else {
                     regs.P.z = 0;
@@ -180,7 +216,7 @@ impl Instruction {
             //         }
             //     }
             //     // TODO: Decimal flag
-            //     if bus.cpu.e || regs.P.m == 1 {
+            //     if bus.get_cpu().e || regs.P.m == 1 {
             //         // 8-Bit
 
             //         let mut data =
@@ -192,8 +228,8 @@ impl Instruction {
             //             // borrow required
             //             data_high += 1;
             //            regs.P.c = 0;
-            //            regs.C.A = bus.cpu.regs.borrow().C.A.wrapping_add(data_low.into());
-            //            regs.C.B = bus.cpu.regs.borrow().C.B.wrapping_add(data_high.into());
+            //            regs.C.A = bus.get_cpu().regs.borrow()C.A.wrapping_add(data_low.into());
+            //            regs.C.B = bus.get_cpu().regs.borrow()C.B.wrapping_add(data_high.into());
 
             //             if u16::from(regs.C) == 0 {
             //                regs.P.z = 1;
@@ -208,8 +244,8 @@ impl Instruction {
             //            regs.P.v = 1;
             //         } else {
             //            regs.P.c = 1;
-            //            regs.C.A = bus.cpu.regs.borrow().C.A.wrapping_add(data_low.into());
-            //            regs.C.B = bus.cpu.regs.borrow().C.B.wrapping_add(data_high.into());
+            //            regs.C.A = bus.get_cpu().regs.borrow()C.A.wrapping_add(data_low.into());
+            //            regs.C.B = bus.get_cpu().regs.borrow()C.B.wrapping_add(data_high.into());
 
             //             if u16::from(regs.C) == 0 {
             //                regs.P.z = 1;
@@ -226,7 +262,7 @@ impl Instruction {
             //     }
             // }
             // Opcodes::ASL => {
-            //     if bus.cpu.e || regs.P.m == 1 {
+            //     if bus.get_cpu().e || regs.P.m == 1 {
             //         let mut val;
             //         if self.address_mode == AddressModes::Accumulator {
             //             val =regs.C.A as u8;
@@ -273,9 +309,9 @@ impl Instruction {
             //     }
             // }
             Opcodes::BIT => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if !is_16_bit_mem_and_accu {
-                    // if bus.cpu.e || regs.P.m == 0 {
+                    // if bus.get_cpu().e || regs.P.m == 0 {
                     // if self.address_mode == AddressModes::Immediate {
                     //     if self.payload[0] == 0 {
                     //        regs.P.z = 1;
@@ -307,18 +343,18 @@ impl Instruction {
                 }
             }
             Opcodes::BRA => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 let val = (self.payload[0] as i8) as i16;
                 let foo = (regs.PC as i32 + val as i32) as i32;
                 regs.PC = foo as u16;
             }
             Opcodes::BRL => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 let val = self.payload[0] as u16 | (self.payload[1] as u16) << 8;
                 regs.PC += val;
             }
             Opcodes::BEQ => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if regs.P.z == 1 {
                     let mut addr = (self.payload[0] as i8) as i16;
                     addr += regs.PC as i16;
@@ -326,7 +362,7 @@ impl Instruction {
                 }
             }
             Opcodes::BCC => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if regs.P.c == 0 {
                     let mut addr = (self.payload[0] as i8) as i16;
                     addr += regs.PC as i16;
@@ -334,46 +370,46 @@ impl Instruction {
                 }
             }
             Opcodes::BCS => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if regs.P.c == 1 {
                     let val = (self.payload[0] as i8) as i16 + regs.PC as i16;
                     regs.PC = val as u16;
                 }
             }
             Opcodes::BPL => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if regs.P.n == 0 {
                     let val = (self.payload[0] as i8) as i16 + regs.PC as i16;
                     regs.PC = val as u16;
                 }
             }
             Opcodes::BMI => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if regs.P.n == 1 {
                     let val = (self.payload[0] as i8) as i16 + regs.PC as i16;
                     regs.PC = val as u16;
                 }
             }
             Opcodes::BRK => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 regs.PC += 2;
                 // TODO: Eval this..
                 //regs.PC = effective_address.unwrap().address;
             }
             Opcodes::BVS => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if regs.P.v == 1 {
                     let val = (self.payload[0] as i8) as i16 + regs.PC as i16;
                     regs.PC = val as u16;
                 }
             }
             Opcodes::CLD => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 regs.P.d = 0;
             }
             Opcodes::CMP => {
                 // let val;
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if !is_16_bit_mem_and_accu {
                     let val = value.unwrap().lower_to_number() as u8;
                     let res = (u16::from(regs.C.A) as u8) - val;
@@ -413,18 +449,18 @@ impl Instruction {
                 }
             }
             Opcodes::SEI => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 regs.P.i = 1;
             }
             Opcodes::CLC => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 regs.P.c = 0;
             }
             Opcodes::CPX => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 // 8 Bit registers
                 if !is_16_bit_index_register {
-                    // if bus.cpu.e || regs.P.x == 1 {
+                    // if bus.get_cpu().e || regs.P.x == 1 {
                     let val;
                     // if self.address_mode != AddressModes::Immediate {
                     val = value.unwrap().lower_to_number() as u8;
@@ -475,10 +511,27 @@ impl Instruction {
                     }
                 }
             }
+            //            Opcodes::DEY => {
+            //                let mut regs = bus.get_cpu().regs.borrow_mut();
+            //                let index: u16 = u16::from(regs.Y).wrapping_sub(1);
+            //                regs.Y = IndexRegister::from(index);
+            //                if u16::from(regs.Y) == 0 {
+            //                    regs.P.z = 1;
+            //                }
+            //                if is_16_bit_index_register {
+            //                    if u16::from(regs.Y.get_low()) >> 7 == 1 {
+            //                        regs.P.z = 1;
+            //                    }
+            //                } else {
+            //                    if u16::from(regs.Y) >> 15 == 1 {
+            //                        regs.P.z = 1;
+            //                    }
+            //                }
+            //            }
             Opcodes::DEY => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                if bus.cpu.e || regs.P.m == 1 {
-                    regs.Y.low = bus.cpu.regs.borrow().Y.low.wrapping_sub(1);
+                let mut regs = bus.get_cpu().regs.borrow_mut();
+                if bus.get_cpu().get_emulation_mode() || regs.P.m == 1 {
+                    regs.Y.low = bus.get_cpu().regs.borrow().Y.low.wrapping_sub(1);
                     if regs.Y.low as u8 >> 7 == 1 {
                         regs.P.n = 1;
                     } else {
@@ -490,8 +543,9 @@ impl Instruction {
                         regs.P.z = 0;
                     }
                 } else {
-                    regs.Y =
-                        IndexRegister::from(u16::from(bus.cpu.regs.borrow().Y).wrapping_sub(1));
+                    regs.Y = IndexRegister::from(
+                        u16::from(bus.get_cpu().regs.borrow().Y).wrapping_sub(1),
+                    );
                     if u16::from(regs.Y) >> 15 == 1 {
                         regs.P.n = 1;
                     } else {
@@ -505,33 +559,33 @@ impl Instruction {
                 }
             }
             // Opcodes::EOR => {
-            //     if bus.cpu.e || regs.P.m == 1 {
+            //     if bus.get_cpu().e || regs.P.m == 1 {
             //         let val = bus.read(effective_address.unwrap());
             //        regs.C =
-            //             Accumulator::from(regs.C.B | (cpu.regs.C.A as u8 ^ val) as u16);
+            //             Accumulator::from(regs.C.B | (cpu.regs.borrow()C.A as u8 ^ val) as u16);
             //     } else {
             //         let val = bus.read(effective_address.unwrap()) as u16
             //             | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
-            //        regs.C = Accumulator::from(u16::from(bus.cpu.regs.borrow().C) ^ val);
+            //        regs.C = Accumulator::from(u16::from(bus.get_cpu().regs.borrow()C) ^ val);
             //     }
             // }
             Opcodes::XCE => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 // Exchange carry with phantom emulation flag
                 // TODO: Reset programm bank register
-                let temp = bus.cpu.e;
-                bus.cpu.e = regs.P.c != 0;
+                let temp = bus.get_cpu().get_emulation_mode();
+                bus.get_cpu().set_emulation_mode(regs.P.c != 0);
                 regs.P.c = temp as _;
             }
             Opcodes::SEP => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 // Set Status Bits
                 let tmp = <u8>::from(regs.P);
                 let next = tmp | self.payload[0]; // Set bits
                 regs.P = StatusRegister::from(next);
             }
             Opcodes::REP => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 // Reset Status Bits
                 let tmp = <u8>::from(regs.P);
                 let next = tmp & !self.payload[0]; // Clear bits
@@ -540,15 +594,15 @@ impl Instruction {
             Opcodes::PEA => {
                 let low = self.payload[0];
                 let high = self.payload[1];
-                bus.cpu.stack_push(high);
-                bus.cpu.stack_push(low);
+                bus.get_cpu().stack_push(high);
+                bus.get_cpu().stack_push(low);
             }
             Opcodes::PHB => {
-                let regs = bus.cpu.regs.borrow().clone();
-                bus.cpu.stack_push(regs.DBR);
+                let regs = bus.get_cpu().regs.borrow();
+                bus.get_cpu().stack_push(regs.DBR);
             }
             Opcodes::LDX => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if regs.P.x != 1 {
                     let mut val = 0;
                     // if self.address_mode == AddressModes::Immediate {
@@ -592,7 +646,7 @@ impl Instruction {
                 }
             }
             Opcodes::LDY => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if regs.P.x != 1 {
                     let mut val = 0;
                     // if self.address_mode == AddressModes::Immediate {
@@ -640,8 +694,8 @@ impl Instruction {
                 //regs.PC += 1;
             }
             Opcodes::TXS => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                if bus.cpu.e {
+                let mut regs = bus.get_cpu().regs.borrow_mut();
+                if bus.get_cpu().get_emulation_mode() {
                     // TXS emu
                     regs.S.high = 1; // High byte stack pointer is always 1
                     if regs.P.x != 1 {
@@ -665,7 +719,7 @@ impl Instruction {
                 }
             }
             Opcodes::TXY => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 // 8-bit index registers
                 if regs.P.x == 1 {
                     regs.Y.low = regs.X.low;
@@ -686,7 +740,7 @@ impl Instruction {
                 }
             }
             Opcodes::TYX => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 // 8-bit index registers
                 if regs.P.x == 1 {
                     regs.X.low = regs.Y.low;
@@ -707,57 +761,60 @@ impl Instruction {
                 }
             }
             Opcodes::JMP => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                println!("====> Jump instruction: JMP");
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if follow_jumps {
                     regs.PC = effective_address.unwrap().address;
                     if self.address_mode == AddressModes::AbsoluteLong {
                         regs.PBR = effective_address.unwrap().bank;
                     }
-                    //bus.cpu.
+                    //bus.get_cpu().
                     // | (regs.DBR as u16) << 16;
                     //regs.PC = value.unwrap().lower_to_number() as u16;
                 }
             }
             Opcodes::JSR => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                println!("====> Jump instruction JSR");
+                let regs = bus.get_cpu().regs.borrow().clone();
                 if follow_jumps {
                     let pc_low = (regs.PC & 0x00ff) as u8;
                     let pc_high = (regs.PC >> 8) as u8;
                     if self.address_mode == AddressModes::AbsoluteLong {
-                        let bank = regs.PBR;
-                        bus.cpu.stack_push(bank);
+                        let bank = regs.PBR.clone();
+                        bus.get_cpu().stack_push(bank);
                     }
 
-                    bus.cpu.stack_push(pc_high);
-                    bus.cpu.stack_push(pc_low);
+                    bus.get_cpu().stack_push(pc_high);
+                    bus.get_cpu().stack_push(pc_low);
+                    let mut regs_mut = bus.get_cpu().regs.borrow_mut();
 
                     // let address = effective_address
                     if self.address_mode == AddressModes::AbsoluteLong {
-                        regs.PBR = effective_address.unwrap().bank;
+                        regs_mut.PBR = effective_address.unwrap().bank;
                     }
-                    regs.PC = effective_address.unwrap().address;
+                    regs_mut.PC = effective_address.unwrap().address;
                     //regs.PC = value.unwrap().lower_to_number() as u16;
                 }
             }
             // TODO:
             Opcodes::RTI => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                if bus.cpu.e {
-                    regs.P = StatusRegister::from(bus.cpu.stack_pull());
-                    let high = bus.cpu.stack_pull();
-                    let low = bus.cpu.stack_pull();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
+                if bus.get_cpu().get_emulation_mode() {
+                    regs.P = StatusRegister::from(bus.get_cpu().stack_pull());
+                    let high = bus.get_cpu().stack_pull();
+                    let low = bus.get_cpu().stack_pull();
                     regs.PC = low as u16 | (high as u16) << 8;
                 } else {
-                    regs.P = StatusRegister::from(bus.cpu.stack_pull());
-                    let bank = bus.cpu.stack_pull();
-                    let high = bus.cpu.stack_pull();
-                    let low = bus.cpu.stack_pull();
+                    regs.P = StatusRegister::from(bus.get_cpu().stack_pull());
+                    let bank = bus.get_cpu().stack_pull();
+                    let high = bus.get_cpu().stack_pull();
+                    let low = bus.get_cpu().stack_pull();
                     regs.PC = low as u16 | (high as u16) << 8;
                     regs.PBR = bank;
                 }
             }
             // Opcodes::ROL => {
-            //     if bus.cpu.e || regs.P.m == 1 {
+            //     if bus.get_cpu().e || regs.P.m == 1 {
             //         let mut val;
             //         if self.address_mode == AddressModes::Accumulator {
             //             val =regs.C.A as u8
@@ -794,24 +851,24 @@ impl Instruction {
             //     }
             // }
             Opcodes::RTS => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                let op_low = bus.cpu.stack_pull();
-                let op_high = bus.cpu.stack_pull();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
+                let op_low = bus.get_cpu().stack_pull();
+                let op_high = bus.get_cpu().stack_pull();
                 regs.PC = ((op_high as u16) << 8) | op_low as u16;
             }
             Opcodes::RTL => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                let op_low = bus.cpu.stack_pull();
-                let op_high = bus.cpu.stack_pull();
-                let pbr = bus.cpu.stack_pull();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
+                let op_low = bus.get_cpu().stack_pull();
+                let op_high = bus.get_cpu().stack_pull();
+                let pbr = bus.get_cpu().stack_pull();
                 regs.PC = ((op_high as u16) << 8) | op_low as u16;
                 regs.PBR = pbr;
             }
 
             Opcodes::LDA => {
-                let is_16_bit_mem_and_accu = bus.cpu.is_16_bit_mem_and_accu();
-                let mut regs = bus.cpu.regs.borrow_mut();
-                // if !is_16_bit_mem_and_accu(bus.cpu) {
+                let is_16_bit_mem_and_accu = bus.get_cpu().is_16_bit_mem_and_accu();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
+                // if !is_16_bit_mem_and_accu(bus.get_cpu(). {
                 let val;
                 let msb;
 
@@ -853,7 +910,7 @@ impl Instruction {
                 // }
             }
             // Opcodes::LSR => {
-            //     if bus.cpu.e || regs.P.m == 1 {
+            //     if bus.get_cpu().e || regs.P.m == 1 {
             //         let mut val;
             //         if self.address_mode == AddressModes::Accumulator {
             //             val = u16::from(regs.C) as u8;
@@ -889,8 +946,8 @@ impl Instruction {
             // }
             // TODO: TEST this!
             Opcodes::SBC => {
-                let mut regs = bus.cpu.regs.borrow_mut(); // TODO: Decimal flag
-                if regs.P.m == 1 || bus.cpu.e {
+                let mut regs = bus.get_cpu().regs.borrow_mut(); // TODO: Decimal flag
+                if regs.P.m == 1 || bus.get_cpu().get_emulation_mode() {
                     // 8-Bit
                     if regs.C.A as i8 - (bus.read(effective_address.unwrap()) as i8) < 0 {
                         regs.P.v = 1;
@@ -952,7 +1009,7 @@ impl Instruction {
                 }
             }
             Opcodes::STA => {
-                let regs = bus.cpu.regs.borrow(); // println!("STA ====>{:?}", self.payload);
+                let regs = bus.get_cpu().regs.borrow_mut(); // println!("STA ====>{:?}", self.payload);
                 if is_16_bit_mem_and_accu {
                     bus.write(effective_address.unwrap(), regs.C.A as u8);
                 } else {
@@ -962,15 +1019,15 @@ impl Instruction {
                 }
             }
             Opcodes::STZ => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 bus.write(effective_address.unwrap(), 0x0);
                 // reset zero flag
                 regs.P.z = 0;
             }
             Opcodes::STX => {
-                let regs = bus.cpu.regs.borrow();
+                let regs = bus.get_cpu().regs.borrow_mut();
                 let X = regs.X;
-                if bus.cpu.is_16_bit_index() {
+                if bus.get_cpu().is_16_bit_index() {
                     bus.write(effective_address.unwrap(), X.low as u8);
                 } else {
                     bus.write(effective_address.unwrap(), X.low as u8);
@@ -978,9 +1035,9 @@ impl Instruction {
                 }
             }
             Opcodes::STY => {
-                let regs = bus.cpu.regs.borrow();
+                let regs = bus.get_cpu().regs.borrow_mut();
                 let Y = regs.Y;
-                if bus.cpu.is_16_bit_index() {
+                if bus.get_cpu().is_16_bit_index() {
                     bus.write(effective_address.unwrap(), Y.low as u8);
                 } else {
                     bus.write(effective_address.unwrap(), Y.low as u8);
@@ -988,16 +1045,16 @@ impl Instruction {
                 }
             }
             Opcodes::TCS => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                if bus.cpu.e {
+                let mut regs = bus.get_cpu().regs.borrow_mut();
+                if bus.get_cpu().get_emulation_mode() {
                     regs.S = IndexRegister::from(regs.C.A as u16);
                 } else {
                     regs.S = IndexRegister::from(u16::from(regs.C));
                 }
             }
             Opcodes::TAX => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                if !bus.cpu.e {
+                let mut regs = bus.get_cpu().regs.borrow_mut();
+                if !bus.get_cpu().get_emulation_mode() {
                     // native mode
                     // 8 Bit accumulator, 8 bit index registers
                     regs.X.low = regs.C.A;
@@ -1028,8 +1085,8 @@ impl Instruction {
                 }
             }
             Opcodes::TAY => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                if !bus.cpu.e {
+                let mut regs = bus.get_cpu().regs.borrow_mut();
+                if !bus.get_cpu().get_emulation_mode() {
                     // native mode
                     // 8 Bit accumulator, 8 bit index registers
                     regs.Y.low = regs.C.A;
@@ -1060,7 +1117,7 @@ impl Instruction {
                 }
             }
             Opcodes::TCD => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 regs.D = u16::from(regs.C);
                 if regs.D >> 7 == 1 {
                     regs.P.n = 1;
@@ -1074,7 +1131,7 @@ impl Instruction {
                 }
             }
             // Opcodes::DEC => {
-            //     if bus.cpu.e || regs.P.m == 1 {
+            //     if bus.get_cpu().e || regs.P.m == 1 {
             //         let mut val;
             //         if self.address_mode == AddressModes::Accumulator {
             //             val =regs.C.A as u8;
@@ -1125,7 +1182,7 @@ impl Instruction {
             // }
             // TODO: SET STATUS FLAGS!!!!
             Opcodes::DEX => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 let index: u16 = u16::from(regs.X).wrapping_sub(1);
                 regs.X = IndexRegister::from(index);
                 if u16::from(regs.X) == 0 {
@@ -1141,25 +1198,25 @@ impl Instruction {
                     }
                 }
             }
-            Opcodes::DEY => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                let index: u16 = u16::from(regs.Y).wrapping_sub(1);
-                regs.Y = IndexRegister::from(index);
-                if u16::from(regs.Y) == 0 {
-                    regs.P.z = 1;
-                }
-                if is_16_bit_index_register {
-                    if u16::from(regs.Y.get_low()) >> 7 == 1 {
-                        regs.P.z = 1;
-                    }
-                } else {
-                    if u16::from(regs.Y) >> 15 == 1 {
-                        regs.P.z = 1;
-                    }
-                }
-            }
+            //            Opcodes::DEY => {
+            //                let mut regs = bus.get_cpu().regs.borrow_mut();
+            //                let index: u16 = u16::from(regs.Y).wrapping_sub(1);
+            //                regs.Y = IndexRegister::from(index);
+            //                if u16::from(regs.Y) == 0 {
+            //                    regs.P.z = 1;
+            //                }
+            //                if is_16_bit_index_register {
+            //                    if u16::from(regs.Y.get_low()) >> 7 == 1 {
+            //                        regs.P.z = 1;
+            //                    }
+            //                } else {
+            //                    if u16::from(regs.Y) >> 15 == 1 {
+            //                        regs.P.z = 1;
+            //                    }
+            //                }
+            //            }
             Opcodes::INX => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 let index: u16 = u16::from(regs.X).wrapping_add(1);
                 regs.X = IndexRegister::from(index);
                 if u16::from(regs.X) == 0 {
@@ -1176,7 +1233,7 @@ impl Instruction {
                 }
             }
             Opcodes::INY => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 let index: u16 = u16::from(regs.Y).wrapping_add(1);
                 regs.Y = IndexRegister::from(index);
                 if u16::from(regs.Y) == 0 {
@@ -1193,7 +1250,7 @@ impl Instruction {
                 }
             }
             // Opcodes::INC => {
-            //     if bus.cpu.e || regs.P.m == 1 {
+            //     if bus.get_cpu().e || regs.P.m == 1 {
             //         if self.address_mode == AddressModes::Accumulator {
             //            regs.C.A += 1;
             //             if u16::from(regs.C.A as u8) == 0 {
@@ -1223,7 +1280,7 @@ impl Instruction {
             //         }
             //     } else {
             //         if self.address_mode == AddressModes::Accumulator {
-            //            regs.C = Accumulator::from(u16::from(bus.cpu.regs.borrow().C) + 1);
+            //            regs.C = Accumulator::from(u16::from(bus.get_cpu().regs.borrow()C) + 1);
             //             if u16::from(regs.C) == 0 {
             //                regs.P.z = 1;
             //             } else {
@@ -1255,7 +1312,7 @@ impl Instruction {
             //     }
             // }
             Opcodes::BNE => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 if regs.P.z == 1 {
                     return;
                 } else {
@@ -1264,9 +1321,9 @@ impl Instruction {
                 }
             }
             Opcodes::PLD => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                let low = bus.cpu.stack_pull();
-                let high = bus.cpu.stack_pull();
+                let low = bus.get_cpu().stack_pull().clone();
+                let high = bus.get_cpu().stack_pull().clone();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 regs.D = low as u16 | (high as u16) << 8;
 
                 if regs.D == 0 {
@@ -1281,18 +1338,18 @@ impl Instruction {
                 }
             }
             Opcodes::PLP => {
-                let stack_item = bus.cpu.stack_pull();
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let stack_item = bus.get_cpu().stack_pull();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 regs.P = StatusRegister::from(stack_item);
             }
             Opcodes::PLX => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                if bus.cpu.e || regs.P.x == 1 {
-                    regs.C.A = bus.cpu.stack_pull() as u16;
+                let mut regs = bus.get_cpu().regs.borrow_mut();
+                if bus.get_cpu().get_emulation_mode() || regs.P.x == 1 {
+                    regs.C.A = bus.get_cpu().stack_pull() as u16;
                     regs.P.n = (regs.C.A as u8) >> 7;
                 } else {
-                    let low = bus.cpu.stack_pull();
-                    let high = bus.cpu.stack_pull();
+                    let low = bus.get_cpu().stack_pull();
+                    let high = bus.get_cpu().stack_pull();
                     regs.C = Accumulator::from(u16::from(low as u16 | (high as u16) << 8));
                     if u16::from(regs.C) == 0 {
                         regs.P.z = 1;
@@ -1307,44 +1364,46 @@ impl Instruction {
                 }
             }
             Opcodes::PHB => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                bus.cpu.stack_push(regs.DBR);
+                let dbr = bus.get_cpu().regs.borrow().DBR;
+                bus.get_cpu().stack_push(dbr);
             }
             Opcodes::PHP => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                bus.cpu.stack_push(u8::from(regs.P));
+                let regs = bus.get_cpu().regs.borrow();
+                bus.get_cpu().stack_push(u8::from(regs.P));
             }
             Opcodes::PHD => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                bus.cpu.stack_push(u8::from((regs.D >> 8) as u8));
-                bus.cpu.stack_push(u8::from((regs.D & 0x0f) as u8));
+                let regs = bus.get_cpu().regs.borrow().clone();
+                bus.get_cpu().stack_push(u8::from((regs.D >> 8) as u8));
+                bus.get_cpu().stack_push(u8::from((regs.D & 0x0f) as u8));
             }
             Opcodes::PHA => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                if bus.cpu.e || regs.P.m == 1 {
-                    bus.cpu.stack_push(regs.C.A as u8);
+                let regs = bus.get_cpu().regs.borrow().clone();
+                let A = regs.C.A;
+                let B = regs.C.B;
+                if bus.get_cpu().get_emulation_mode() || regs.P.m == 1 {
+                    bus.get_cpu().stack_push(A as u8);
                 } else {
-                    bus.cpu.stack_push(regs.C.B as u8);
-                    bus.cpu.stack_push(regs.C.A as u8);
+                    bus.get_cpu().stack_push(B as u8);
+                    bus.get_cpu().stack_push(A as u8);
                 }
             }
             Opcodes::PHK => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                bus.cpu.stack_push(regs.PBR);
+                let regs = bus.get_cpu().regs.borrow().clone();
+                bus.get_cpu().stack_push(regs.PBR);
             }
             Opcodes::PHX => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                if bus.cpu.e || regs.P.x == 1 {
-                    bus.cpu.stack_push(regs.X.low as u8);
+                let regs = bus.get_cpu().regs.borrow().clone();
+                if bus.get_cpu().get_emulation_mode() || regs.P.x == 1 {
+                    bus.get_cpu().stack_push(regs.X.low as u8);
                 } else {
-                    bus.cpu.stack_push(regs.X.high as u8);
-                    bus.cpu.stack_push(regs.X.low as u8);
+                    bus.get_cpu().stack_push(regs.X.high as u8);
+                    bus.get_cpu().stack_push(regs.X.low as u8);
                 }
             }
             Opcodes::PLA => {
-                let mut regs = bus.cpu.regs.borrow_mut();
-                if bus.cpu.e || regs.P.m == 1 {
-                    regs.C.A = bus.cpu.stack_pull() as u16;
+                let mut regs = bus.get_cpu().regs.borrow_mut();
+                if bus.get_cpu().get_emulation_mode() || regs.P.m == 1 {
+                    regs.C.A = bus.get_cpu().stack_pull() as u16;
                     if (regs.C.A as u8) >> 7 == 1 {
                         regs.P.n = 1;
                     } else {
@@ -1356,8 +1415,8 @@ impl Instruction {
                         regs.P.z = 0;
                     }
                 } else {
-                    let low = bus.cpu.stack_pull();
-                    let high = bus.cpu.stack_pull();
+                    let low = bus.get_cpu().stack_pull();
+                    let high = bus.get_cpu().stack_pull();
                     regs.C = Accumulator::from(low as u16 | (high as u16) << 8);
                     if u16::from(regs.C) >> 15 == 1 {
                         regs.P.n = 1;
@@ -1372,8 +1431,8 @@ impl Instruction {
                 }
             }
             Opcodes::PLB => {
-                let stack_item = bus.cpu.stack_pull();
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let stack_item = bus.get_cpu().stack_pull();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 regs.DBR = stack_item;
                 if regs.DBR >> 7 == 1 {
                     regs.P.n = 1;
@@ -1388,7 +1447,7 @@ impl Instruction {
             }
             Opcodes::MVN => {
                 let (src_bnk, dest_bnk) = (self.payload[1], self.payload[0]);
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 loop {
                     if regs.C == Accumulator::from(0xffffu16) {
                         break;
@@ -1417,20 +1476,20 @@ impl Instruction {
                 // panic!("src: {} : {} dest: {} : {} count: {}", src_bnk, source, dest_bnk, dest, length);/
             }
             Opcodes::XBA => {
-                let mut regs = bus.cpu.regs.borrow_mut();
+                let mut regs = bus.get_cpu().regs.borrow_mut();
                 let temp = regs.C.B;
                 regs.C.B = regs.C.A;
                 regs.C.A = temp;
             }
             // Opcodes::ORA => {
-            //     if bus.cpu.e || regs.P.m == 1 {
+            //     if bus.get_cpu().e || regs.P.m == 1 {
             //         let val;
             //         if self.address_mode == AddressModes::Immediate {
             //             val = self.payload[0];
             //         } else {
             //             val = bus.read(effective_address.unwrap());
             //         }
-            //        regs.C.A = bus.cpu.regs.borrow().C.A | val as u16;
+            //        regs.C.A = bus.get_cpu().regs.borrow()C.A | val as u16;
             //         if u16::from(regs.C.A) as u8 >> 7 == 1 {
             //            regs.P.n = 1;
             //         } else {
@@ -1450,7 +1509,7 @@ impl Instruction {
             //             val = bus.read(effective_address.unwrap()) as u16
             //                 | (bus.read(effective_address.unwrap().add(1)) as u16) << 8;
             //         }
-            //        regs.C = Accumulator::from(u16::from(bus.cpu.regs.borrow().C) | val as u16);
+            //        regs.C = Accumulator::from(u16::from(bus.get_cpu().regs.borrow()C) | val as u16);
             //         if u16::from(regs.C) >> 15 == 1 {
             //            regs.P.n = 1;
             //         } else {
