@@ -349,7 +349,7 @@ fn get_operant_string(
             ret.push_str(&format!("{}", number));
             ret
         }
-        AddressModes::ProgrammCounterRelative => {
+        AddressModes::ProgramCounterRelative => {
             let constant: i8 = payload[0] as _;
             let mut ret = String::from("");
             println!("Address: {:x}", address);
@@ -389,7 +389,7 @@ fn get_operant_string(
         AddressModes::BlockMove => format!("0x{:x}, 0x{:x}", payload[0], payload[1]),
         AddressModes::StackAbsolute => format!("0x{:x}", payload[0]),
         AddressModes::StackRTL => String::from(""),
-        AddressModes::ProgrammCounterRelativeLong => {
+        AddressModes::ProgramCounterRelativeLong => {
             let constant: u32 = payload[0] as u32 | (payload[1] as u32) << 8;
             let mut ret = String::from("$");
             let mut number = format!("{:x}, X", constant).to_string();

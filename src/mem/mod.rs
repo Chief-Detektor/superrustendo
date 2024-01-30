@@ -1,9 +1,11 @@
-use std::cell::{RefCell, RefMut};
+use std::cell::{RefCell};
 use std::rc::Rc;
 
 use crate::cartridge::{Cartridge, RomTypes};
-use crate::cpu::address::{self, Address};
+use crate::cpu::address::{Address};
+// TODO: Use superrustendo lib path
 use crate::cpu::CPU;
+use crate::apu::Apu;
 use crate::ppu::PPU;
 
 use self::wram::WRAM;
@@ -16,6 +18,7 @@ pub mod hw_registers;
 
 //#[derive(Debug)]
 pub struct Bus {
+    apu: RefCell<Apu>,
     cartridge: Option<Cartridge>,
     wram: Rc<RefCell<WRAM>>,
     ppu: PPU,
@@ -26,12 +29,17 @@ pub struct Bus {
 impl Bus {
     pub fn new() -> Self {
         Bus {
+            apu: RefCell::new(Apu::new()),
             cartridge: None,
             wram: Rc::new(RefCell::new(WRAM::new())),
             ppu: PPU::new(),
             cpu: CPU::new(),
             mdr: RefCell::new(0),
         }
+    }
+
+    pub fn get_apu(&self) -> &RefCell<Apu> {
+        &self.apu
     }
 
     pub fn get_cartridge(&self) -> &Option<Cartridge> {
@@ -108,7 +116,7 @@ impl Bus {
             address.bank, address.address
         );
 
-        if let Some(val) = HWRegister::dispatch_read(self, address) {
+        if let Some(val) = HWRegister::dispatch_read(&self, address) {
             self.set_mdr(val);
             return val;
         }

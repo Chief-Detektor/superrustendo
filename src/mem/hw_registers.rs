@@ -249,6 +249,24 @@ impl HWRegister {
         if HWRegister::is_hw_register(address) {
             match HWRegister::get_register(address.address) {
                 Some(reg) => {
+                    match reg.get_component() {
+                        BusComponent::APU => match reg {
+                            HWRegister::APUIO0 => {
+                                bus.get_apu().borrow_mut().bus_write(0x2140, value);
+                            }
+                            HWRegister::APUIO1 => {
+                                bus.get_apu().borrow_mut().bus_write(0x2141, value);
+                            }
+                            HWRegister::APUIO2 => {
+                                bus.get_apu().borrow_mut().bus_write(0x2142, value);
+                            }
+                            HWRegister::APUIO3 => {
+                                bus.get_apu().borrow_mut().bus_write(0x2143, value);
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    }
                     match reg.get_type() {
                         Type::W8
                         | Type::W8x2
@@ -260,7 +278,12 @@ impl HWRegister {
                             println!("Writing {:?}, value: {:x}", reg, value);
                         }
                         _ => {
-                            panic!("Write to read only register {:x} ({:?}), value: {:x}", reg.get_address(), reg, value);
+                            panic!(
+                                "Write to read only register {:x} ({:?}), value: {:x}",
+                                reg.get_address(),
+                                reg,
+                                value
+                            );
                             //                            println!("Writing {:?}, value: {:x}", reg, value);
                         }
                     }
@@ -287,6 +310,24 @@ impl HWRegister {
         if HWRegister::is_hw_register(address) {
             match HWRegister::get_register(address.address) {
                 Some(reg) => {
+                    match reg.get_component() {
+                        BusComponent::APU => match reg {
+                            HWRegister::APUIO0 => {
+                                bus.get_apu().borrow().bus_read(0x2140);
+                            }
+                            HWRegister::APUIO1 => {
+                                bus.get_apu().borrow().bus_read(0x2141);
+                            }
+                            HWRegister::APUIO2 => {
+                                bus.get_apu().borrow().bus_read(0x2142);
+                            }
+                            HWRegister::APUIO3 => {
+                                bus.get_apu().borrow().bus_read(0x2143);
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    }
                     match reg.get_type() {
                         // Handling of write only registers => return MDR
                         Type::W8 | Type::W8x2 | Type::W16 | Type::W24 => {
@@ -654,61 +695,61 @@ impl HWRegister {
             HWRegister::A2A2L => Type::RW16,
             HWRegister::A2A2H => Type::RW16,
             HWRegister::NTLR2 => Type::RW8,
-            HWRegister::DMAP3 => todo!(),
-            HWRegister::BBAD3 => todo!(),
-            HWRegister::A1T3L => todo!(),
-            HWRegister::A1T3H => todo!(),
-            HWRegister::A1B3 => todo!(),
-            HWRegister::DAS3L => todo!(),
-            HWRegister::DAS3H => todo!(),
-            HWRegister::DASB3 => todo!(),
-            HWRegister::A2A3L => todo!(),
-            HWRegister::A2A3H => todo!(),
-            HWRegister::NTLR3 => todo!(),
-            HWRegister::DMAP4 => todo!(),
-            HWRegister::BBAD4 => todo!(),
-            HWRegister::A1T4L => todo!(),
-            HWRegister::A1T4H => todo!(),
-            HWRegister::A1B4 => todo!(),
-            HWRegister::DAS4L => todo!(),
-            HWRegister::DAS4H => todo!(),
-            HWRegister::DASB4 => todo!(),
-            HWRegister::A2A4L => todo!(),
-            HWRegister::A2A4H => todo!(),
-            HWRegister::NTLR4 => todo!(),
-            HWRegister::DMAP5 => todo!(),
-            HWRegister::BBAD5 => todo!(),
-            HWRegister::A1T5L => todo!(),
-            HWRegister::A1T5H => todo!(),
-            HWRegister::A1B5 => todo!(),
-            HWRegister::DAS5L => todo!(),
-            HWRegister::DAS5H => todo!(),
-            HWRegister::DASB5 => todo!(),
-            HWRegister::A2A5L => todo!(),
-            HWRegister::A2A5H => todo!(),
-            HWRegister::NTLR5 => todo!(),
-            HWRegister::DMAP6 => todo!(),
-            HWRegister::BBAD6 => todo!(),
-            HWRegister::A1T6L => todo!(),
-            HWRegister::A1T6H => todo!(),
-            HWRegister::A1B6 => todo!(),
-            HWRegister::DAS6L => todo!(),
-            HWRegister::DAS6H => todo!(),
-            HWRegister::DASB6 => todo!(),
-            HWRegister::A2A6L => todo!(),
-            HWRegister::A2A6H => todo!(),
-            HWRegister::NTLR6 => todo!(),
-            HWRegister::DMAP7 => todo!(),
-            HWRegister::BBAD7 => todo!(),
-            HWRegister::A1T7L => todo!(),
-            HWRegister::A1T7H => todo!(),
-            HWRegister::A1B7 => todo!(),
-            HWRegister::DAS7L => todo!(),
-            HWRegister::DAS7H => todo!(),
-            HWRegister::DASB7 => todo!(),
-            HWRegister::A2A7L => todo!(),
-            HWRegister::A2A7H => todo!(),
-            HWRegister::NTLR7 => todo!(),
+            HWRegister::DMAP3 => Type::RW8,
+            HWRegister::BBAD3 => Type::RW8,
+            HWRegister::A1T3L => Type::RW24,
+            HWRegister::A1T3H => Type::RW24,
+            HWRegister::A1B3 => Type::RW24,
+            HWRegister::DAS3L => Type::RW24,
+            HWRegister::DAS3H => Type::RW24,
+            HWRegister::DASB3 => Type::RW24,
+            HWRegister::A2A3L => Type::RW16,
+            HWRegister::A2A3H => Type::RW16,
+            HWRegister::NTLR3 => Type::RW8,
+            HWRegister::DMAP4 => Type::RW8,
+            HWRegister::BBAD4 => Type::RW8,
+            HWRegister::A1T4L => Type::RW24,
+            HWRegister::A1T4H => Type::RW24,
+            HWRegister::A1B4 => Type::RW24,
+            HWRegister::DAS4L => Type::RW24,
+            HWRegister::DAS4H => Type::RW24,
+            HWRegister::DASB4 => Type::RW24,
+            HWRegister::A2A4L => Type::RW16,
+            HWRegister::A2A4H => Type::RW16,
+            HWRegister::NTLR4 => Type::RW8,
+            HWRegister::DMAP5 => Type::RW8,
+            HWRegister::BBAD5 => Type::RW8,
+            HWRegister::A1T5L => Type::RW24,
+            HWRegister::A1T5H => Type::RW24,
+            HWRegister::A1B5 => Type::RW24,
+            HWRegister::DAS5L => Type::RW24,
+            HWRegister::DAS5H => Type::RW24,
+            HWRegister::DASB5 => Type::RW24,
+            HWRegister::A2A5L => Type::RW16,
+            HWRegister::A2A5H => Type::RW16,
+            HWRegister::NTLR5 => Type::RW8,
+            HWRegister::DMAP6 => Type::RW8,
+            HWRegister::BBAD6 => Type::RW8,
+            HWRegister::A1T6L => Type::RW24,
+            HWRegister::A1T6H => Type::RW24,
+            HWRegister::A1B6 => Type::RW24,
+            HWRegister::DAS6L => Type::RW24,
+            HWRegister::DAS6H => Type::RW24,
+            HWRegister::DASB6 => Type::RW24,
+            HWRegister::A2A6L => Type::RW16,
+            HWRegister::A2A6H => Type::RW16,
+            HWRegister::NTLR6 => Type::RW8,
+            HWRegister::DMAP7 => Type::RW8,
+            HWRegister::BBAD7 => Type::RW8,
+            HWRegister::A1T7L => Type::RW24,
+            HWRegister::A1T7H => Type::RW24,
+            HWRegister::A1B7 => Type::RW24,
+            HWRegister::DAS7L => Type::RW24,
+            HWRegister::DAS7H => Type::RW24,
+            HWRegister::DASB7 => Type::RW24,
+            HWRegister::A2A7L => Type::RW16,
+            HWRegister::A2A7H => Type::RW16,
+            HWRegister::NTLR7 => Type::RW8,
         }
     }
 

@@ -31,7 +31,7 @@ pub const G1_OP_CMP: u8 = 0b1100_0000; // Compare the Accumulator
 pub const G1_OP_EOR: u8 = 0b0100_0000; // Exclusive Or the Accumulator
 pub const G1_OP_LDA: u8 = 0b1010_0000; // Load the Accumulator (LDA)
 pub const G1_OP_ORA: u8 = 0b0000_0000; // Or the Accumulator
-pub const G1_OP_SBC: u8 = 0b1110_0000; // Substract with Borrow from the Accumulator
+pub const G1_OP_SBC: u8 = 0b1110_0000; // Subtract with Borrow from the Accumulator
 pub const G1_OP_STA: u8 = 0b1000_0000; // Store the Acccumulator
 
 // Group II Instructions

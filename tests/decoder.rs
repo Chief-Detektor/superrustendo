@@ -1,12 +1,8 @@
 #[allow(unused_macros)]
 macro_rules! opcode_test {
     ($raw_byte:expr, $opcode:expr, $addressmode:expr) => {{
-        let mut c = CPU::new();
-        let mut m = Bus {
-            cartridge: None,
-            wram: WRAM::new(),
-        };
-        let d = Decoder::new(&mut c, &mut m, false);
+        let mut m = Bus::new();
+        let d = Decoder::new(&mut m, false);
         let result = d.decode($raw_byte);
         let res = result.unwrap();
         let addr = res.1;
@@ -24,9 +20,7 @@ mod tests {
     use superrustendo::cpu::addressmodes::AddressModes;
     use superrustendo::cpu::decoder::Decoder;
     use superrustendo::cpu::decoder::Opcodes;
-    use superrustendo::cpu::CPU;
     use superrustendo::mem::Bus;
-    use superrustendo::mem::WRAM;
     #[test]
     fn brk() {
         opcode_test!(0x0, Opcodes::BRK, AddressModes::StackInterrupt);
@@ -783,15 +777,15 @@ mod tests {
     }
     #[test]
     fn bcc() {
-        opcode_test!(0x90, Opcodes::BCC, AddressModes::ProgrammCounterRelative);
+        opcode_test!(0x90, Opcodes::BCC, AddressModes::ProgramCounterRelative);
     }
     #[test]
     fn bcs() {
-        opcode_test!(0xb0, Opcodes::BCS, AddressModes::ProgrammCounterRelative);
+        opcode_test!(0xb0, Opcodes::BCS, AddressModes::ProgramCounterRelative);
     }
     #[test]
     fn beq() {
-        opcode_test!(0xf0, Opcodes::BEQ, AddressModes::ProgrammCounterRelative);
+        opcode_test!(0xf0, Opcodes::BEQ, AddressModes::ProgramCounterRelative);
     }
     #[test]
     fn bit_1() {
@@ -815,35 +809,35 @@ mod tests {
     }
     #[test]
     fn bmi() {
-        opcode_test!(0x30, Opcodes::BMI, AddressModes::ProgrammCounterRelative);
+        opcode_test!(0x30, Opcodes::BMI, AddressModes::ProgramCounterRelative);
     }
     #[test]
     fn bne() {
-        opcode_test!(0xd0, Opcodes::BNE, AddressModes::ProgrammCounterRelative);
+        opcode_test!(0xd0, Opcodes::BNE, AddressModes::ProgramCounterRelative);
     }
     #[test]
     fn bpl() {
-        opcode_test!(0x10, Opcodes::BPL, AddressModes::ProgrammCounterRelative);
+        opcode_test!(0x10, Opcodes::BPL, AddressModes::ProgramCounterRelative);
     }
     #[test]
     fn bra() {
-        opcode_test!(0x80, Opcodes::BRA, AddressModes::ProgrammCounterRelative);
+        opcode_test!(0x80, Opcodes::BRA, AddressModes::ProgramCounterRelative);
     }
     #[test]
     fn brl() {
         opcode_test!(
             0x82,
             Opcodes::BRL,
-            AddressModes::ProgrammCounterRelativeLong
+            AddressModes::ProgramCounterRelativeLong
         );
     }
     #[test]
     fn bvc() {
-        opcode_test!(0x50, Opcodes::BVC, AddressModes::ProgrammCounterRelative);
+        opcode_test!(0x50, Opcodes::BVC, AddressModes::ProgramCounterRelative);
     }
     #[test]
     fn bvs() {
-        opcode_test!(0x70, Opcodes::BVS, AddressModes::ProgrammCounterRelative);
+        opcode_test!(0x70, Opcodes::BVS, AddressModes::ProgramCounterRelative);
     }
     #[test]
     fn clc() {

@@ -266,6 +266,14 @@ impl Accumulator {
         self.B = B.into();
         self
     }
+    pub fn set_C(&mut self, value: u16) -> &mut Self {
+        self.A = value & 0xff;
+        self.B = (value & 0xff00) >> 8;
+        self
+    }
+    pub fn get_C(&self) -> u16 {
+        return ((self.B as u16) << 8) | (self.A as u16);
+    }
 }
 
 bitfields!(
@@ -305,7 +313,7 @@ impl IndexRegister {
     }
 }
 
-// TODO: Proper inital state
+// TODO: Proper initial state
 #[derive(ByteStruct, PartialEq, Debug, Clone, Copy)]
 #[byte_struct_le]
 pub struct Registers {
@@ -315,9 +323,9 @@ pub struct Registers {
     Y: IndexRegister, // Y Index Register,
     D: u16,           // Direct Page Register
     S: IndexRegister, // Stack Pointer (or 24 bits?)
-    PBR: u8,          // Programm Bank Register
+    PBR: u8,          // Program Bank Register
     DBR: u8,          // Data Bank Register
-    PC: u16,          // Programm Counter
+    PC: u16,          // Program Counter
 }
 
 impl Registers {
@@ -410,8 +418,8 @@ impl Registers {
 
 #[derive(Debug)]
 pub struct CPU {
-    regs: RefCell<Registers>,
-    stack: RefCell<Stack>,
+    regs: Rc<RefCell<Registers>>,
+    stack: Rc<RefCell<Stack>>,
     e: RefCell<bool>, // Emulation mode
 }
 
@@ -434,8 +442,8 @@ impl Default for Registers {
 impl CPU {
     pub fn new() -> CPU {
         CPU {
-            regs: RefCell::new(Registers::default()),
-            stack: RefCell::new(Stack::default()),
+            regs: Rc::new(RefCell::new(Registers::default())),
+            stack: Rc::new(RefCell::new(Stack::default())),
             e: RefCell::new(true),
         }
     }
@@ -450,9 +458,13 @@ impl CPU {
     //        return &self.stack;
     //    }
 
-    //    pub fn get_regs(&self) -> &Registers {
-    //        return &self.regs;
-    //    }
+    pub fn get_regs(&self) -> Registers {
+        return self.regs.borrow().clone();
+    }
+
+    pub fn regs_ref(&self) -> &RefCell<Registers> {
+        &self.regs
+    }
 
     pub fn get_emulation_mode(&self) -> bool {
         return *self.e.borrow();
@@ -462,6 +474,15 @@ impl CPU {
     //    }
 
     pub fn set_emulation_mode(&self, e: bool) {
+        //if e {
+        //    // Set accumulator and index registers to 8 bit
+        //    self.regs.borrow_mut().P.m = 1;
+        //    self.regs.borrow_mut().P.x = 1;
+        //} else {
+        //    // Set accumulator and index registers to 16 bit}
+        //    self.regs.borrow_mut().P.m = 0;
+        //    self.regs.borrow_mut().P.x = 0;
+        //}
         *self.e.borrow_mut() = e;
     }
 
@@ -481,7 +502,8 @@ impl CPU {
     }
 
     pub fn stack_pull(&self) -> u8 {
-        let index = <u16>::from(*self.regs.borrow().get_S());
+        let s = self.regs.clone().borrow().get_S().clone();
+        let index = <u16>::from(s);
         let ret = self.stack.borrow().content[index as usize];
 
         let mut new_index: i32 = index as i32 + 1;
