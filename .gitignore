@@ -1,14 +1,42 @@
-Cargo.lock
+# Rust
 /target
-**/*.rs.bk
-main.cpp
-OUTPUT.DIS
-readme.html
-readme.txt
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test ROMs
+snes-test-roms/
 *.sfc
 *.smc
 *.zip
+*.rom
+
+# Temporary files
+*.tmp
+*.temp
+*.bk
+*.bak
+
+# Output files
+OUTPUT.DIS
+readme.html
+readme.txt
 test
-test.sfc
-*.EXE
-snes-test-roms/*
+
+# Logs
+*.log
