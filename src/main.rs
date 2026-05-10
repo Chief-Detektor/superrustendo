@@ -15,6 +15,7 @@ use crate::cpu::decoder::*;
 use crate::mem::Bus;
 
 fn main() -> std::io::Result<()> {
+    env_logger::init();
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
@@ -25,7 +26,7 @@ fn main() -> std::io::Result<()> {
     }
 
     let card = cartridge::Cartridge::load_rom(Path::new(&args[1])).expect("Error loading");
-    println!("Loaded Cardidge: {:?}", card.header);
+    log::info!("Loaded Cartridge: {:?}", card.header);
 
     let mut bus = Bus::new();
 

@@ -1,4 +1,5 @@
 use crate::cpu::address::Address;
+use log;
 
 use super::{wram::WRAM, Bus};
 
@@ -275,7 +276,7 @@ impl HWRegister {
                         | Type::RW8
                         | Type::RW16
                         | Type::RW24 => {
-                            println!("Writing {:?}, value: {:x}", reg, value);
+                            log::debug!("Writing {:?}, value: {:x}", reg, value);
                         }
                         _ => {
                             panic!(
@@ -289,11 +290,11 @@ impl HWRegister {
                     }
                 }
                 None => {
-                    println!(
+                    log::warn!(
                         "Write to unknown register {:?}, value: {:x} => IGNORE",
                         address, value
                     );
-                    //println!("Write to {:?}, value: {:x}", HWRegister::get_register(address.address), value);
+                    //log::debug!("Write to {:?}, value: {:x}", HWRegister::get_register(address.address), value);
                 }
             }
         }
@@ -336,12 +337,12 @@ impl HWRegister {
                             return Some(bus.get_mdr());
                         }
                         _ => {
-                            println!("Reading {:?}", reg);
+                            log::debug!("Reading {:?}", reg);
                         }
                     }
                 }
                 _ => {
-                    println!("Reading {:?}", HWRegister::get_register(address.address));
+                    log::debug!("Reading {:?}", HWRegister::get_register(address.address));
                 }
             }
         } else {

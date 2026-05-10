@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::convert::From;
 use std::fmt;
 use std::rc::Rc;
+use log;
 
 pub mod address;
 pub mod addressmodes;
@@ -488,7 +489,7 @@ impl CPU {
 
     pub fn stack_push(&self, payload: u8) {
         let index = <u16>::from(*self.regs.borrow().get_S());
-        println!("Pushing {:x} on stack address {:x}", payload, index);
+        log::debug!("Pushing {:x} on stack address {:x}", payload, index);
 
         let mut new_index: i32 = index as i32 - 1;
 
@@ -513,7 +514,7 @@ impl CPU {
         self.regs
             .borrow_mut()
             .set_S(&IndexRegister::from(new_index as u16));
-        println!("Popping {:x} from Stack", ret);
+        log::debug!("Popping {:x} from Stack", ret);
         ret
     }
 }

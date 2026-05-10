@@ -21,7 +21,10 @@ use superrustendo::{cartridge::Cartridge};
 
 extern crate hex;
 
+extern crate log;
+
 fn main() -> Result<()> {
+    env_logger::init();
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
@@ -33,7 +36,7 @@ fn main() -> Result<()> {
 
     // init stuff
     let card = Cartridge::load_rom(Path::new(&args[1])).expect("Error loading");
-    println!("Loaded Cardidge: {:?}", card.header);
+    log::info!("Loaded Cartridge: {:?}", card.header);
 
     // This translates addresses to components or correct memory locations
     let mut bus = Bus::new();
@@ -51,13 +54,13 @@ fn main() -> Result<()> {
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
-                // println!("Line: {:?}", line);
+                // log::debug!("Line: {:?}", line);
                 if !eval_line(line, &mut decoder) {
                     break;
                 }
             }
             Err(ReadlineError::Interrupted) => break,
-            Err(_) => println!("No input"),
+            Err(_) => log::warn!("No input"),
         }
     }
 
@@ -66,7 +69,7 @@ fn main() -> Result<()> {
 
 fn print_instruction(inst: Option<Instruction>) {
     let i = inst.unwrap();
-    println!(
+    log::info!(
         "{:?}, {:?}, payload: {:?}",
         i.opcode, i.address_mode, i.payload
     );
@@ -80,11 +83,11 @@ fn eval_line(line: String, decoder: &mut Decoder) -> bool {
                 let val = hex::decode(addr);
                 match val {
                     Ok(v) => {
-                        println!("Value: {:?} hex: {:x}{:x}", v, v[0], v[1]);
+                        log::info!("Value: {:?} hex: {:x}{:x}", v, v[0], v[1]);
                     }
                     Err(_) => {}
                 }
-                // println!("Adding breakpoint at {:x}", hex::encode(&addr).parse::<u64>().unwrap());
+                // log::debug!("Adding breakpoint at {:x}", hex::encode(&addr).parse::<u64>().unwrap());
             }
         }
         Some("s" | "step") => {
@@ -101,21 +104,21 @@ fn eval_line(line: String, decoder: &mut Decoder) -> bool {
                     print_instruction(decoder.next());
                 }
             }
-            // println!("Step: {:?}", command.next());
+            // log::debug!("Step: {:?}", command.next());
         }
         Some("p" | "print") => {
             match command.next() {
-                Some(thing) if thing == "cpu" => println!("{:?}", decoder.get_bus().get_cpu()),
+                Some(thing) if thing == "cpu" => log::info!("{:?}", decoder.get_bus().get_cpu()),
                 _ => {}
             }
-            println!("Print: {:?}", command.next());
+            log::debug!("Print: {:?}", command.next());
         }
         Some("q" | "quit") => {
-            println!("Quit");
+            log::info!("Quit");
             return false;
         }
-        Some("g" | "goto") => println!("Goto: {:?}", command.next()),
-        Some(unknown) => println!("unknown command, {:?}", unknown),
+        Some("g" | "goto") => log::debug!("Goto: {:?}", command.next()),
+        Some(unknown) => log::warn!("unknown command, {:?}", unknown),
         None => {}
     }
 

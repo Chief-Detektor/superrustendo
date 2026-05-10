@@ -8,7 +8,7 @@ fn rotate_right_u8(bus: &mut Bus, data: u8) -> u8 {
     let new_carry = data & 0x1;
     let mut val = data >> 1;
     let temp = bus.get_cpu().get_regs().get_P().get_c();
-    println!("ROR: temp: {:b}", temp);
+    log::debug!("ROR: temp: {:b}", temp);
     val = (temp << 7) | val;
     let mut binding = bus.get_cpu().regs_ref().borrow_mut();
     binding.get_P_mut().set_c(new_carry);
@@ -30,9 +30,9 @@ pub fn ror(bus: &mut Bus, effective_address: Option<Address>, address_mode: Addr
         let mut val: u8;
         if address_mode == AddressModes::Accumulator {
             val = bus.get_cpu().get_regs().get_C().get_A();
-            println!("Before ROR: val: {:b}, {:x}", val, val);
+            log::debug!("Before ROR: val: {:b}, {:x}", val, val);
             val = rotate_right_u8(bus, val);
-            println!("ROR: val: {:b}, {:x}", val, val);
+            log::debug!("ROR: val: {:b}, {:x}", val, val);
             bus.get_cpu().regs_ref().borrow_mut().get_C_mut().set_A(val);
         } else {
             val = bus.read(effective_address.unwrap());
@@ -46,7 +46,7 @@ pub fn ror(bus: &mut Bus, effective_address: Option<Address>, address_mode: Addr
         if address_mode == AddressModes::Accumulator {
             val = <u16>::from(*bus.get_cpu().get_regs().get_C());
             val = rotate_right_u16(bus, val);
-            println!("ROR 16Bit val: {:b}", val);
+            log::debug!("ROR 16Bit val: {:b}", val);
             bus.get_cpu()
                 .regs_ref()
                 .borrow_mut()
@@ -68,6 +68,7 @@ pub fn ror(bus: &mut Bus, effective_address: Option<Address>, address_mode: Addr
 mod tests {
     use super::*;
     use crate::cpu::addressmodes::AddressModes;
+use log;
     #[test]
     fn test_ror() {
         let mut bus = Bus::new();
@@ -79,21 +80,21 @@ mod tests {
         }
         ror(&mut bus, None, AddressModes::Accumulator);
         let a = bus.get_cpu().get_regs().get_C().get_A();
-        println!("A accumulator: {:b}, {:x}, {}", a, a, a);
+        log::debug!("A accumulator: {:b}, {:x}, {}", a, a, a);
         assert_eq!(bus.get_cpu().get_regs().get_C().get_A(), 0x33);
         assert_eq!(bus.get_cpu().get_regs().get_P().get_c(), 0);
         assert_eq!(bus.get_cpu().get_regs().get_P().get_z(), 0);
         assert_eq!(bus.get_cpu().get_regs().get_P().get_n(), 0);
         ror(&mut bus, None, AddressModes::Accumulator);
         let a = bus.get_cpu().get_regs().get_C().get_A();
-        println!("A accumulator: {:b}, {:x}, {}", a, a, a);
+        log::debug!("A accumulator: {:b}, {:x}, {}", a, a, a);
         assert_eq!(bus.get_cpu().get_regs().get_C().get_A(), 0x19);
         assert_eq!(bus.get_cpu().get_regs().get_P().get_c(), 1);
         assert_eq!(bus.get_cpu().get_regs().get_P().get_z(), 0);
         assert_eq!(bus.get_cpu().get_regs().get_P().get_n(), 0);
         ror(&mut bus, None, AddressModes::Accumulator);
         let a = bus.get_cpu().get_regs().get_C().get_A();
-        println!("A accumulator: {:b}, {:x}, {}", a, a, a);
+        log::debug!("A accumulator: {:b}, {:x}, {}", a, a, a);
         assert_eq!(bus.get_cpu().get_regs().get_C().get_A(), 0x8c);
         assert_eq!(bus.get_cpu().get_regs().get_P().get_c(), 1);
         assert_eq!(bus.get_cpu().get_regs().get_P().get_z(), 0);

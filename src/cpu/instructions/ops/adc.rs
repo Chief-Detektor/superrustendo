@@ -61,6 +61,7 @@ pub fn adc(bus: &mut Bus, value: OperantValue) {
 #[cfg(test)]
 mod tests {
     use crate::{cpu::instructions::OperantValue, mem::Bus};
+use log;
 
     #[test]
     fn test_adc_emu() {
@@ -110,7 +111,7 @@ mod tests {
 
         let regs = bus.get_cpu().regs_ref().borrow();
 
-        println!("A: {:X}", regs.C.A);
+        log::debug!("A: {:X}", regs.C.A);
 
         assert_eq!(regs.C.A, 0x02);
         assert_eq!(regs.P.c, 0);
@@ -140,7 +141,7 @@ mod tests {
         }
         super::adc(&mut bus, OperantValue::Short(0x01));
         let regs = bus.get_cpu().regs_ref().borrow();
-        println!("A: {:X}", regs.C.A);
+        log::debug!("A: {:X}", regs.C.A);
         assert_eq!(regs.C.A, 0x03);
         assert_eq!(regs.P.c, 0);
         assert_eq!(regs.P.v, 0);
@@ -171,7 +172,7 @@ mod tests {
         //bus.write(address, 0xff);
         super::adc(&mut bus, OperantValue::Short(0xff));
         let regs = bus.get_cpu().regs_ref().borrow();
-        println!("A: {:X}", regs.C.A);
+        log::debug!("A: {:X}", regs.C.A);
         assert_eq!(regs.C.A, 0x00);
         assert_eq!(regs.P.c, 1);
         assert_eq!(regs.P.v, 0);
@@ -202,7 +203,7 @@ mod tests {
         //bus.write(address, 0x00);
         super::adc(&mut bus, OperantValue::Short(0x00));
         let regs = bus.get_cpu().regs_ref().borrow();
-        println!("A: {:X}", regs.C.A);
+        log::debug!("A: {:X}", regs.C.A);
         assert_eq!(regs.C.A, 0x00);
         assert_eq!(regs.P.c, 0);
         assert_eq!(regs.P.v, 0);
@@ -235,7 +236,7 @@ mod tests {
         //bus.write(address, 0xff);
         super::adc(&mut bus, OperantValue::Short(0x01));
         let regs = bus.get_cpu().regs_ref().borrow();
-        println!("A: {:X}", regs.C.A);
+        log::debug!("A: {:X}", regs.C.A);
         assert_eq!(regs.C.A, 0x81);
         assert_eq!(regs.P.c, 0);
         assert_eq!(regs.P.v, 1);
@@ -265,7 +266,7 @@ mod tests {
         }
         super::adc(&mut bus, OperantValue::Long(0x0001));
         let regs = bus.get_cpu().regs_ref().borrow();
-        println!("C: {:X}", regs.C.get_C());
+        log::debug!("C: {:X}", regs.C.get_C());
         assert_eq!(regs.C.get_C(), 0x0002);
         assert_eq!(regs.P.c, 0);
         assert_eq!(regs.P.v, 0);
@@ -295,7 +296,7 @@ mod tests {
         }
         super::adc(&mut bus, OperantValue::Long(0x0001));
         let regs = bus.get_cpu().regs_ref().borrow();
-        println!("C: {:X}", regs.C.get_C());
+        log::debug!("C: {:X}", regs.C.get_C());
         assert_eq!(regs.C.get_C(), 0x0003);
         assert_eq!(regs.P.c, 0);
         assert_eq!(regs.P.v, 0);
@@ -327,7 +328,7 @@ mod tests {
         //bus.write(address, 0xffff);
         super::adc(&mut bus, OperantValue::Long(0xffff));
         let regs = bus.get_cpu().regs_ref().borrow();
-        println!("C: {:X}", regs.C.get_C());
+        log::debug!("C: {:X}", regs.C.get_C());
         assert_eq!(regs.C.get_C(), 0x0000);
         assert_eq!(regs.P.c, 1);
         assert_eq!(regs.P.v, 0);
@@ -359,7 +360,7 @@ mod tests {
         //bus.write(address, 0x0000);
         super::adc(&mut bus, OperantValue::Long(0x0000));
         let regs = bus.get_cpu().regs_ref().borrow();
-        println!("C: {:X}", regs.C.get_C());
+        log::debug!("C: {:X}", regs.C.get_C());
         assert_eq!(regs.C.get_C(), 0x0000);
         assert_eq!(regs.P.c, 0);
         assert_eq!(regs.P.v, 0);
@@ -392,7 +393,7 @@ mod tests {
         //bus.write(address, 0xff);
         super::adc(&mut bus, OperantValue::Long(0x0001));
         let regs = bus.get_cpu().regs_ref().borrow();
-        println!("C: {:X}", regs.C.get_C());
+        log::debug!("C: {:X}", regs.C.get_C());
         assert_eq!(regs.C.get_C(), 0x8001);
         assert_eq!(regs.P.c, 0);
         assert_eq!(regs.P.v, 1);

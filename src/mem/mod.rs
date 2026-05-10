@@ -11,6 +11,7 @@ use crate::ppu::PPU;
 use self::wram::WRAM;
 
 use hw_registers::HWRegister;
+use log;
 
 pub mod wram;
 
@@ -111,7 +112,7 @@ impl Bus {
     pub fn read(&self, address: Address) -> u8 {
         // TODO: First check for WRAM Access
         //
-        println!(
+        log::trace!(
             "[BUS Read] Bank {:x}, Address: {:x}",
             address.bank, address.address
         );
@@ -130,7 +131,7 @@ impl Bus {
     }
     // Read n bytes from the bus
     pub fn read_bytes(&self, address: Address, length: usize) -> Vec<u8> {
-        println!("Reading {} bytes from address: {:?}", length, address);
+        log::debug!("Reading {} bytes from address: {:?}", length, address);
         let mut bytes: Vec<u8> = Vec::with_capacity(length);
         for i in 0..length {
             bytes.push(self.read(address.add(i)));
@@ -143,7 +144,7 @@ impl Bus {
     pub fn write(&self, address: Address, value: u8) {
         HWRegister::dispatch_write(self, address, value);
 
-        println!(
+        log::trace!(
             "[BUS Write] {:x}, to Bank {:x}, Address: {:x}",
             value, address.bank, address.address
         );

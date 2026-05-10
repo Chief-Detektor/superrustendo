@@ -9,16 +9,16 @@ pub fn trb(bus: &mut Bus, address: Address, address_mode: AddressModes) /* -> us
     let mut cycles = 0;
     if regs.P.m == 1 {
         let mut val = bus.read(address) as u8;
-        println!("val: {:#x}", val);
+        log::debug!("val: {:#x}", val);
         if address_mode == AddressModes::Absolute {
             cycles = 6;
         } else {
             cycles = 5;
         }
-        println!("val: {:#b}", !(val as u8));
+        log::debug!("val: {:#b}", !(val as u8));
         val = val & !(regs.C.A as u8);
-        println!("val: {:#b}", val);
-        println!("val: {:#b}", !(val as u8));
+        log::debug!("val: {:#b}", val);
+        log::debug!("val: {:#b}", !(val as u8));
         regs.P.z = (val == 0) as u8;
         bus.write(address, val);
     } else {
@@ -50,6 +50,7 @@ mod tests{
         cpu::{addressmodes::AddressModes, decoder::Decoder},
         mem::Bus,
     };
+    use log;
     #[test]
     fn trb_instruction_8_bit_zero() {
         let mut bus = Bus::new();
@@ -64,7 +65,7 @@ mod tests{
         bus.write(address, 0xff);
         let address_mode = AddressModes::Absolute;
         super::trb(&mut bus, address, address_mode);
-        println!("P: {:?}", bus.get_cpu().get_regs().get_P());
+        log::debug!("P: {:?}", bus.get_cpu().get_regs().get_P());
         assert!(bus.read(Address::new(0x0)) == 0x00);
         assert!(bus.get_cpu().get_regs().get_P().get_z() == 1);
     }
@@ -82,8 +83,8 @@ mod tests{
         bus.write(address, 0xff);
         let address_mode = AddressModes::Absolute;
         super::trb(&mut bus, address, address_mode);
-        println!("P: {:?}", bus.get_cpu().get_regs().get_P());
-        println!("val: {:#b}", bus.read(Address::new(0x0)));
+        log::debug!("P: {:?}", bus.get_cpu().get_regs().get_P());
+        log::debug!("val: {:#b}", bus.read(Address::new(0x0)));
         assert!(bus.read(Address::new(0x0)) == 0b1010101);
         assert!(bus.get_cpu().get_regs().get_P().get_z() == 0);
     }
@@ -102,7 +103,7 @@ mod tests{
         bus.write(address.add(1), 0xff);
         let address_mode = AddressModes::Absolute;
         super::trb(&mut bus, address, address_mode);
-        println!("P: {:?}", bus.get_cpu().get_regs().get_P());
+        log::debug!("P: {:?}", bus.get_cpu().get_regs().get_P());
         assert!(bus.read(Address::new(0x0)) == 0x00);
         assert!(bus.read(Address::new(0x1)) == 0x00);
         assert!(bus.get_cpu().get_regs().get_P().get_z() == 1);
@@ -122,7 +123,7 @@ mod tests{
         bus.write(address.add(1), 0xff);
         let address_mode = AddressModes::Absolute;
         super::trb(&mut bus, address, address_mode);
-        println!("P: {:?}", bus.get_cpu().get_regs().get_P());
+        log::debug!("P: {:?}", bus.get_cpu().get_regs().get_P());
         assert!(bus.read(Address::new(0x0)) == 0b101);
         assert!(bus.read(Address::new(0x1)) == 0b1010101);
         assert!(bus.get_cpu().get_regs().get_P().get_z() == 0);

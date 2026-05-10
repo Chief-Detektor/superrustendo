@@ -6,6 +6,7 @@ use crate::cpu::constants::*;
 use crate::cpu::instructions::Instruction;
 
 use crate::mem::Bus;
+use log;
 
 
 
@@ -465,7 +466,7 @@ impl<'t> Decoder<'t> {
     }
 
     pub fn execute_instruction(&mut self, instruction: &mut Instruction) {
-        println!("Executing: {:?}", instruction);
+        log::debug!("Executing: {:?}", instruction);
         instruction.execute(self.bus, self.follow_jumps);
     }
 

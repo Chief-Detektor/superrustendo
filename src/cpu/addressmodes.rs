@@ -4,6 +4,7 @@ use super::decoder::Opcodes;
 use super::Registers;
 
 use crate::mem::Bus;
+use log;
 use std::convert::TryInto;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -528,7 +529,7 @@ impl AddressModes {
                 return Some(address);
             }
             AddressModes::BlockMove => {
-                println!(
+                log::warn!(
                     "AddressMode: {:?}, opcpode: {:?}, cpu-regs: {:?}",
                     self,
                     opcode,

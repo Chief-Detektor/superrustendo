@@ -38,6 +38,7 @@ mod tests {
         },
         mem::Bus,
     };
+    use log;
 
     #[test]
     fn xce_instruction() {
@@ -56,14 +57,14 @@ mod tests {
         // Test emulation mode -> native mode
         {
             P.set_c(0);
-            println!("{:?}", bus.get_cpu());
+            log::debug!("{:?}", bus.get_cpu());
             bus.get_cpu().get_regs().set_P(&P);
-            println!("{:?}", bus.get_cpu());
+            log::debug!("{:?}", bus.get_cpu());
 
             let mut decoder = Decoder::new(&mut bus, true);
             decoder.execute_instruction(&mut i);
 
-            println!("{:?}", bus.get_cpu());
+            log::debug!("{:?}", bus.get_cpu());
 
             assert!(bus.get_cpu().get_emulation_mode() == false);
             assert!(bus.get_cpu().get_regs().get_P().get_m() == 1);

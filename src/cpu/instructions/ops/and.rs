@@ -41,6 +41,7 @@ mod tests {
         cpu::{addressmodes::AddressModes},
         mem::Bus,
     };
+    use log;
 
     #[test]
     fn and_instruction() {
@@ -59,10 +60,10 @@ mod tests {
             //regs.get_mut().set_C(&Accumulator::from(0b00110000 as u16));
             //bus.get_cpu().regs_ref().borrow().set_C(&Accumulator::from(0b11111111 as u16));
 //            *bus.get_cpu().get_regs().get_C_mut() = Accumulator::from(0b00000001 as u16);
-            println!("Before:");
-            println!("C: {:?}", bus.get_cpu().get_regs().get_C());
-            println!("B: {:x}", bus.get_cpu().get_regs().get_C().get_B());
-            println!("A: {:x}", bus.get_cpu().get_regs().get_C().get_A());
+            log::debug!("Before:");
+            log::debug!("C: {:?}", bus.get_cpu().get_regs().get_C());
+            log::debug!("B: {:x}", bus.get_cpu().get_regs().get_C().get_B());
+            log::debug!("A: {:x}", bus.get_cpu().get_regs().get_C().get_A());
 
             let i = Instruction {
                 address: 0x0,
@@ -77,10 +78,10 @@ mod tests {
             i.execute(&mut bus, false);
 
             // println!("{:?}", cpu)
-            println!("After:");            // println!("{:?}", cpu.get_regs());
-            println!("C: {:?}", bus.get_cpu().get_regs().get_C());
-            println!("B: {:x}", bus.get_cpu().get_regs().get_C().get_B());
-            println!("A: {:x}", bus.get_cpu().get_regs().get_C().get_A());
+            log::debug!("After:");            // log::debug!("{:?}", cpu.get_regs());
+            log::debug!("C: {:?}", bus.get_cpu().get_regs().get_C());
+            log::debug!("B: {:x}", bus.get_cpu().get_regs().get_C().get_B());
+            log::debug!("A: {:x}", bus.get_cpu().get_regs().get_C().get_A());
 
             // 00110000 & 11110011 => 00110000 right?
             assert!(bus.get_cpu().get_regs().get_C().get_A() == 0b00000001);
@@ -113,7 +114,7 @@ mod tests {
             bus.get_cpu().regs_ref().borrow_mut().set_C(&Accumulator::from(0xff00 as u16));
             bus.get_cpu().regs_ref().borrow_mut().get_P_mut().set_m(0);
 
-            println!("{:?}", bus.get_cpu().get_regs());
+            log::debug!("{:?}", bus.get_cpu().get_regs());
             let i = Instruction {
                 address: 0x0,
                 opcode: Opcodes::AND,
@@ -124,9 +125,9 @@ mod tests {
             };
 
             i.execute(&mut bus, false);
-            println!("{:?}", bus.get_cpu().get_regs());
+            log::debug!("{:?}", bus.get_cpu().get_regs());
 
-            println!("{:?}", bus.get_cpu().get_regs().get_C());
+            log::debug!("{:?}", bus.get_cpu().get_regs().get_C());
             assert!(u16::from(*bus.get_cpu().get_regs().get_C()) == 0xff00);
             assert!(bus.get_cpu().get_regs().get_P().get_n() == 1);
             assert!(bus.get_cpu().get_regs().get_P().get_z() == 0);

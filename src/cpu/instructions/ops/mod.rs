@@ -88,10 +88,11 @@ mod xce;
 
 pub mod utils {
     use crate::cpu::Registers;
+use log;
 
     pub fn check_negative_u8(regs: &mut Registers, value: u8) {
-        println!("check negative Value: {:b}", value);
-        println!("check negative calc: {:b}", (value & 0x8));
+        log::debug!("check negative Value: {:b}", value);
+        log::debug!("check negative calc: {:b}", (value & 0x8));
         if (value & 0x80) == 0x80 {
             regs.get_P_mut().set_n(1);
         } else {
@@ -157,9 +158,9 @@ pub mod utils {
             panic!("Value must be between 0 and 99");
         }
         let low = value % 10;
-        println!("Low: {:b}", low);
+        log::debug!("Low: {:b}", low);
         let high = value / 10;
-        println!("High: {:b}", high);
+        log::debug!("High: {:b}", high);
         (high << 4) | low
     }
 

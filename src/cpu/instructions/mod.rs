@@ -2,6 +2,7 @@ use crate::cpu::addressmodes::AddressModes;
 use crate::cpu::decoder::Opcodes;
 use crate::mem::Bus;
 use std::num::Wrapping;
+use log;
 
 use super::address::Address;
 use super::decoder::Decoder;
@@ -256,11 +257,11 @@ impl Instruction {
 //    }
 
     pub fn print_info(&self) {
-        println!("Payload: ");
+        log::debug!("Payload: ");
         for i in 0..self.payload.len() {
-            print!("0x{:x} ", self.payload[i]);
+            log::debug!("0x{:x} ", self.payload[i]);
         }
-        println!(
+        log::debug!(
             "0x{:x}: {:?} {:?}",
             self.address, self.opcode, self.address_mode
         );

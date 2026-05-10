@@ -8,6 +8,7 @@ use std::io::prelude::*;
 use std::path::Path;
 
 use crate::cpu::address::Address;
+use log;
 
 const SMC_OFFSET: usize = 0x200;
 
@@ -300,7 +301,7 @@ impl Cartridge {
         };
 
         if let Some(header_address) = card.heuristics() {
-            println!("{:?}", header_address);
+            log::debug!("{:?}", header_address);
             if let Some(header) = card
                 .load_header(header_address.address as usize | (header_address.bank as usize) << 16)
             {
@@ -319,16 +320,16 @@ impl Cartridge {
         let raw = header.as_mut_slice();
         let snes_header = SnesHeader::read_bytes(&raw[..]);
 
-        // println!("{:?}", snes_header);
+        // log::debug!("{:?}", snes_header);
 
         // TODO: This looks awfull
         let mut i = 0;
         for b in &raw[..] {
             i += 1;
             if *b > 0x1f && *b <= 0x7f && i <= 21 {
-                println!("#====> Snes Title is all asci at: {}, {}", i, *b);
+                log::trace!("#====> Snes Title is all asci at: {}, {}", i, *b);
             } else if i <= 21 {
-                println!("Error! {} is not ascii", *b);
+                log::warn!("Error! {} is not ascii", *b);
                 if snes_header.emu_res < 0x8000 {
                     return Some(snes_header);
                 } else {

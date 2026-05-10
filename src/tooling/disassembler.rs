@@ -3,6 +3,7 @@ use crate::cpu::decoder::Opcodes;
 use crate::cpu::instructions::Instruction;
 use std::collections::HashMap;
 use std::convert::TryInto;
+use log;
 
 // TODO: Use macros to get rid of duplicate code
 
@@ -134,7 +135,7 @@ fn get_operant_string(
                 constant = payload[0] as u16 | (payload[1] as u16) << 8;
             }
 
-            println!("=====> Constant: {:x}", constant);
+            log::debug!("=====> Constant: {:x}", constant);
 
             let mut ret = String::from("$");
             let mut number = format!("{:x}", constant).to_string();
@@ -163,7 +164,7 @@ fn get_operant_string(
                 constant = payload[0] as u16 | (payload[1] as u16) << 8;
             }
 
-            println!("=====> Constant: {:x}", constant);
+            log::debug!("=====> Constant: {:x}", constant);
 
             let mut ret = String::from("$");
             let mut number = format!("{:x}, X", constant).to_string();
@@ -192,7 +193,7 @@ fn get_operant_string(
                 constant = payload[0] as u16 | (payload[1] as u16) << 8;
             }
 
-            println!("=====> Constant: {:x}", constant);
+            log::debug!("=====> Constant: {:x}", constant);
 
             let mut ret = String::from("$");
             let mut number = format!("{:x}, Y", constant).to_string();
@@ -352,8 +353,8 @@ fn get_operant_string(
         AddressModes::ProgramCounterRelative => {
             let constant: i8 = payload[0] as _;
             let mut ret = String::from("");
-            println!("Address: {:x}", address);
-            println!("Offset: {:x}", constant);
+            log::debug!("Address: {:x}", address);
+            log::debug!("Offset: {:x}", constant);
             let mut number = format!(
                 "{:x}",
                 // TODO: Ensure that op_length is properly set on decoding

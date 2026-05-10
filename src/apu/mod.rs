@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use std::thread::sleep;
+use log;
 
 #[derive(Debug, Clone)]
 pub struct Apu {
@@ -80,7 +81,7 @@ impl<'s, 't> Apu {
     }
 
     fn write(&mut self, address: u16, value: u8) {
-        println!("[APU Write] {:x} {:x}", address, value);
+        log::debug!("[APU Write] {:x} {:x}", address, value);
         match Self::resolve(address) {
             MemDestination::DirectPage0 => self.memory[address as usize] = value,
             MemDestination::HardwareRegisters => {
@@ -145,7 +146,7 @@ impl<'s, 't> Apu {
     }
 
     fn read(&self, address: u16) -> u8 {
-        println!("[APU Read] {:x}", address);
+        log::debug!("[APU Read] {:x}", address);
         return match Self::resolve(address) {
             MemDestination::DirectPage0 => self.memory[address as usize],
             MemDestination::HardwareRegisters => match address {

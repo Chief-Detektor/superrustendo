@@ -1,5 +1,7 @@
 use crate::mem::Bus;
 
+use log;
+
 pub fn bcc(bus: &mut Bus, value: u8) /* -> u8  (for counting cycles) */
 {
     let mut regs = bus.get_cpu().regs.borrow_mut();
@@ -25,7 +27,7 @@ mod tests{
             regs.PC = 0x0000;
         }
         bcc(&mut bus, 0x70);
-        println!("cpu: {:?}", bus.get_cpu());
+        log::debug!("cpu: {:?}", bus.get_cpu());
         let regs = bus.get_cpu().regs.borrow();
         assert_eq!(regs.PC, 0x0070);
     }
@@ -39,7 +41,7 @@ mod tests{
             regs.PC = 0x0000;
         }
         bcc(&mut bus, 0x70);
-        println!("cpu: {:?}", bus.get_cpu());
+        log::debug!("cpu: {:?}", bus.get_cpu());
         let regs = bus.get_cpu().regs.borrow();
         // NOTE: PC is incremented by 2 after the instruction is executed. Not by the instruction
         // itself. This is done by the iterator.

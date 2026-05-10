@@ -11,6 +11,7 @@ use superrustendo::tooling::disassembler::PrintToken;
 use superrustendo::{cartridge::Cartridge};
 
 fn main() -> std::io::Result<()> {
+    env_logger::init();
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
@@ -21,7 +22,7 @@ fn main() -> std::io::Result<()> {
     }
 
     let card = Cartridge::load_rom(Path::new(&args[1])).expect("Error loading");
-    println!("Loaded Cardidge: {:?}", card.header);
+    log::info!("Loaded Cartridge: {:?}", card.header);
 
     let cpu = CPU::new();
 
@@ -41,21 +42,20 @@ fn main() -> std::io::Result<()> {
         }
     }
 
-    println!();
-    println!("Disassembled code:");
+    log::info!("Disassembled code:");
 
-    println!("Labels:");
+    log::info!("Labels:");
     for (k, l) in &labels {
-        println!("At {:0x}: {}", k, l);
+        log::info!("At {:0x}: {}", k, l);
     }
 
     for (address, line) in decoded_asm {
         // labels
         if labels.contains_key(&(address as usize)) {
             let label = labels.get(&(address as usize)).unwrap();
-            println!("{}:", label);
+            log::info!("{}:", label);
         }
-        println!("{:x}:{:x}:\t{}", cpu.get_regs().get_PBR(), address, line);
+        log::info!("{:x}:{:x}:\t{}", cpu.get_regs().get_PBR(), address, line);
     }
 
     Ok(())

@@ -2,15 +2,16 @@ use crate::{
     cpu::{address::Address, addressmodes::AddressModes},
     mem::Bus,
 };
+use log;
 
 pub fn jsr(bus: &mut Bus, effective_address: Option<Address>, address_mode: AddressModes) {
-    println!("====> Jump instruction JSR");
+    log::debug!("====> Jump instruction JSR");
     let regs = bus.get_cpu().regs.borrow().clone();
     let pc_low = (regs.PC & 0x00ff) as u8;
     let pc_high = (regs.PC >> 8) as u8;
 
     if address_mode == AddressModes::AbsoluteLong {
-        println!("====> Absolute Long");
+        log::debug!("====> Absolute Long");
         let bank = regs.PBR.clone();
         bus.get_cpu().stack_push(bank);
     }
