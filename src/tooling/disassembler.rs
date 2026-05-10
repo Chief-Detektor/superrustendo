@@ -397,7 +397,7 @@ fn get_operant_string(
                 number = "0".to_owned() + &number;
             }
             let label_number = label_map.len().to_string();
-            &label_map.insert(
+            let _ = label_map.insert(
                 ((address as i32 + 2 + constant as i32) as u32)
                     .try_into()
                     .unwrap(),

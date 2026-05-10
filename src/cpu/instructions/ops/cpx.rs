@@ -1,6 +1,6 @@
-use crate::{cpu::instructions::Operant_Value, mem::Bus};
+use crate::{cpu::instructions::OperantValue, mem::Bus};
 
-pub fn cpx(bus: &mut Bus, value: Option<Operant_Value>) {
+pub fn cpx(bus: &mut Bus, value: Option<OperantValue>) {
     let mut regs = bus.get_cpu().regs.borrow_mut();
     // 8 Bit registers
     if regs.P.x == 0 {

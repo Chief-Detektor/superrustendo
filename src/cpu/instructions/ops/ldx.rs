@@ -1,9 +1,9 @@
 use crate::{
-    cpu::{instructions::Operant_Value, IndexRegister},
+    cpu::{instructions::OperantValue, IndexRegister},
     mem::Bus,
 };
 
-pub fn ldx(bus: &mut Bus, value: Option<Operant_Value>) {
+pub fn ldx(bus: &mut Bus, value: Option<OperantValue>) {
     let is_16_bit_mem_and_accu = bus.get_cpu().is_16_bit_mem_and_accu();
     let is_16_bit_index = bus.get_cpu().is_16_bit_index();
     let mut regs = bus.get_cpu().regs.borrow_mut();
@@ -13,10 +13,10 @@ pub fn ldx(bus: &mut Bus, value: Option<Operant_Value>) {
         //     val = effective_address.unwrap().address;
         // } else {
         match value.unwrap() {
-            Operant_Value::short(v) => {
+            OperantValue::Short(v) => {
                 val = v as i32;
             }
-            Operant_Value::long(v) => {
+            OperantValue::Long(v) => {
                 val = v as i32;
             }
         }

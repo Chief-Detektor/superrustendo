@@ -1,9 +1,9 @@
 #![recursion_limit = "256"]
 
-use std::{env, thread};
-
+use std::env;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
+
 pub mod apu;
 pub mod cartridge;
 pub mod cpu;

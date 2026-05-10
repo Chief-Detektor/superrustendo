@@ -1,7 +1,6 @@
-use std::{
-    thread::{self, sleep},
-    time::Duration,
-};
+use std::time::Duration;
+
+use std::thread::sleep;
 
 #[derive(Debug, Clone)]
 pub struct Apu {

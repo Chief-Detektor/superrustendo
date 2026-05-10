@@ -1,8 +1,8 @@
 use std::num::Wrapping;
 
-use crate::{cpu::instructions::Operant_Value, mem::Bus};
+use crate::{cpu::instructions::OperantValue, mem::Bus};
 
-pub fn cmp(bus: &mut Bus, value: Option<Operant_Value>) {
+pub fn cmp(bus: &mut Bus, value: Option<OperantValue>) {
     //    let (value, cycles) = cpu.read_value(mode);
     let mut regs = bus.get_cpu().regs.borrow_mut();
     if regs.P.m == 1 {

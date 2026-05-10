@@ -1,14 +1,51 @@
+# Rust
 Cargo.lock
 /target
-**/*.rs.bk
-main.cpp
+
+# Build artifacts
+*.rs.bk
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Output files
 OUTPUT.DIS
 readme.html
 readme.txt
+
+# ROM files
 *.sfc
 *.smc
+*.fig
+*.swc
 *.zip
+*.7z
+*.rar
+
+# Test files
 test
 test.sfc
 *.EXE
+
+# Test ROMs directory
 snes-test-roms/*
+!snes-test-roms/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local

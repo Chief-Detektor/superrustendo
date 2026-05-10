@@ -1,7 +1,6 @@
 use crate::cpu::addressmodes::AddressModes;
 use crate::cpu::decoder::Opcodes;
 use crate::mem::Bus;
-use std::borrow::BorrowMut;
 use std::num::Wrapping;
 
 use super::address::Address;
@@ -20,18 +19,18 @@ pub struct Instruction {
 }
 
 #[derive(Debug)]
-enum Operant_Value {
-    short(u8),
-    long(u32),
+enum OperantValue {
+    Short(u8),
+    Long(u32),
 }
 
-impl Operant_Value {
+impl OperantValue {
     fn lower_to_number(&self) -> usize {
         match *self {
-            Operant_Value::short(a) => {
+            OperantValue::Short(a) => {
                 return a as usize;
             }
-            Operant_Value::long(a) => return a as usize,
+            OperantValue::Long(a) => return a as usize,
         }
     }
 }
@@ -77,7 +76,7 @@ impl Instruction {
         }
     }
 
-    fn load_value(&self, bus: &Bus) -> Option<Operant_Value> {
+    fn load_value(&self, bus: &Bus) -> Option<OperantValue> {
         // get address
         let address = self
             .address_mode
@@ -85,11 +84,11 @@ impl Instruction {
         if address.is_some() {
             if !&bus.get_cpu().is_16_bit_mem_and_accu() {
                 let val = bus.read(address.unwrap());
-                return Some(Operant_Value::short(val));
+                return Some(OperantValue::Short(val));
             } else {
                 let val =
                     bus.read(address.unwrap()) as u32 | (bus.read(address.unwrap()) as u32) << 8; //| (regs.PBR as u32) << 16;
-                return Some(Operant_Value::long(val));
+                return Some(OperantValue::Long(val));
             }
         } else {
             return None;
@@ -113,7 +112,7 @@ impl Instruction {
 
             if let Some(a) = address {
                 print!("{:?}", <u16>::from(a));
-                value = Some(Operant_Value::long(<u16>::from(a) as u32));
+                value = Some(OperantValue::Long(<u16>::from(a) as u32));
             } else {
                 value = None;
             }

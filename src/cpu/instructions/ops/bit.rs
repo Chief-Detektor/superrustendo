@@ -1,6 +1,6 @@
-use crate::{cpu::{addressmodes::AddressModes, instructions::Operant_Value}, mem::Bus};
+use crate::{cpu::{addressmodes::AddressModes, instructions::OperantValue}, mem::Bus};
 
-pub fn bit(bus: &mut Bus, value: Option<Operant_Value>, address_mode: AddressModes) {
+pub fn bit(bus: &mut Bus, value: Option<OperantValue>, address_mode: AddressModes) {
     let mut regs = bus.get_cpu().regs.borrow_mut();
     if regs.P.m == 1 {
         let mut val = value.unwrap().lower_to_number() as u8;

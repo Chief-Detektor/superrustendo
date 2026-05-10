@@ -1,4 +1,4 @@
-use crate::{cpu::IndexRegister, mem::Bus};
+use crate::mem::Bus;
 
 pub fn xce(bus: &mut Bus) {
    //  let mut regs = bus.get_cpu().regs.borrow_mut();

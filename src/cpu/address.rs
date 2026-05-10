@@ -48,7 +48,6 @@ impl Address {
             }
             _ => {
                 panic!("Invalid bank for rom access");
-                return *self;
             }
         }
     }
@@ -100,7 +99,6 @@ impl Address {
             }
             _ => {
                 panic!("Invalid bank for rom access");
-                return *self;
             }
         }
     }

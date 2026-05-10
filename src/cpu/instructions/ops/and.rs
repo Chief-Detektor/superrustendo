@@ -1,12 +1,12 @@
 use crate::{cpu::Accumulator, mem::Bus};
 
-use crate::cpu::instructions::Operant_Value;
+use crate::cpu::instructions::OperantValue;
 
-pub fn and(bus: &mut Bus, value: Option<Operant_Value>) {
+pub fn and(bus: &mut Bus, value: Option<OperantValue>) {
     let mut regs = bus.get_cpu().regs.borrow_mut();
     // TODO: This needs to become a function returning an enum having either a 8 or 16 bit value
     match value.unwrap() {
-        Operant_Value::short(val) => {
+        OperantValue::Short(val) => {
             regs.C = Accumulator::from((regs.clone().C.A as u8 & val) as u16);
             if u16::from(regs.C.clone()) >> 8 == 1 {
                 regs.P.n = 1;
@@ -14,7 +14,7 @@ pub fn and(bus: &mut Bus, value: Option<Operant_Value>) {
                 regs.P.n = 0;
             }
         }
-        Operant_Value::long(val) => {
+        OperantValue::Long(val) => {
             regs.C = Accumulator::from(u16::from(regs.C.clone()) & val as u16);
             if u16::from(regs.C.clone()) >> 15 == 1 {
                 regs.P.n = 1;

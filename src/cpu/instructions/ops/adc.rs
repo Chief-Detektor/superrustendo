@@ -1,7 +1,7 @@
-use std::{num::Wrapping, usize, u16};
+use std::{num::Wrapping, u16};
 
 use crate::{
-    cpu::{instructions::Operant_Value, Accumulator},
+    cpu::{instructions::OperantValue, Accumulator},
     mem::Bus,
 };
 
@@ -10,7 +10,7 @@ use super::utils::{
     check_zero,
 };
 
-pub fn adc(bus: &mut Bus, value: Operant_Value) {
+pub fn adc(bus: &mut Bus, value: OperantValue) {
     let mut regs = bus.get_cpu().regs_ref().borrow_mut();
 
     // TODO: Implement decimal mode
@@ -25,8 +25,8 @@ pub fn adc(bus: &mut Bus, value: Operant_Value) {
     // 8 Bit addition
     if regs.P.m == 1 {
         match value {
-            Operant_Value::short(_) => {}
-            Operant_Value::long(_) => panic!("16 Bit addition with 8 Bit accumulator not possible"),
+            OperantValue::Short(_) => {}
+            OperantValue::Long(_) => panic!("16 Bit addition with 8 Bit accumulator not possible"),
         }
 
         let res = Wrapping(regs.C.A as u8) + Wrapping(val as u8) + Wrapping(carry as u8);
@@ -60,7 +60,7 @@ pub fn adc(bus: &mut Bus, value: Operant_Value) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{cpu::instructions::Operant_Value, mem::Bus};
+    use crate::{cpu::instructions::OperantValue, mem::Bus};
 
     #[test]
     fn test_adc_emu() {
@@ -106,7 +106,7 @@ mod tests {
         //let i = decoder.peek();
         //println!("i: {:?}",inst);
 
-        super::adc(&mut bus, Operant_Value::short(0x01));
+        super::adc(&mut bus, OperantValue::Short(0x01));
 
         let regs = bus.get_cpu().regs_ref().borrow();
 
@@ -138,7 +138,7 @@ mod tests {
             regs.P.z = 0;
             regs.P.n = 0;
         }
-        super::adc(&mut bus, Operant_Value::short(0x01));
+        super::adc(&mut bus, OperantValue::Short(0x01));
         let regs = bus.get_cpu().regs_ref().borrow();
         println!("A: {:X}", regs.C.A);
         assert_eq!(regs.C.A, 0x03);
@@ -169,7 +169,7 @@ mod tests {
         }
         //let address = Address::new(0 as u32);
         //bus.write(address, 0xff);
-        super::adc(&mut bus, Operant_Value::short(0xff));
+        super::adc(&mut bus, OperantValue::Short(0xff));
         let regs = bus.get_cpu().regs_ref().borrow();
         println!("A: {:X}", regs.C.A);
         assert_eq!(regs.C.A, 0x00);
@@ -200,7 +200,7 @@ mod tests {
         }
         //let address = Address::new(0 as u32);
         //bus.write(address, 0x00);
-        super::adc(&mut bus, Operant_Value::short(0x00));
+        super::adc(&mut bus, OperantValue::Short(0x00));
         let regs = bus.get_cpu().regs_ref().borrow();
         println!("A: {:X}", regs.C.A);
         assert_eq!(regs.C.A, 0x00);
@@ -233,7 +233,7 @@ mod tests {
         }
         //let address = Address::new(0 as u32);
         //bus.write(address, 0xff);
-        super::adc(&mut bus, Operant_Value::short(0x01));
+        super::adc(&mut bus, OperantValue::Short(0x01));
         let regs = bus.get_cpu().regs_ref().borrow();
         println!("A: {:X}", regs.C.A);
         assert_eq!(regs.C.A, 0x81);
@@ -263,7 +263,7 @@ mod tests {
             regs.P.m = 0;
             regs.P.x = 0;
         }
-        super::adc(&mut bus, Operant_Value::long(0x0001));
+        super::adc(&mut bus, OperantValue::Long(0x0001));
         let regs = bus.get_cpu().regs_ref().borrow();
         println!("C: {:X}", regs.C.get_C());
         assert_eq!(regs.C.get_C(), 0x0002);
@@ -293,7 +293,7 @@ mod tests {
             regs.P.m = 0;
             regs.P.x = 0;
         }
-        super::adc(&mut bus, Operant_Value::long(0x0001));
+        super::adc(&mut bus, OperantValue::Long(0x0001));
         let regs = bus.get_cpu().regs_ref().borrow();
         println!("C: {:X}", regs.C.get_C());
         assert_eq!(regs.C.get_C(), 0x0003);
@@ -325,7 +325,7 @@ mod tests {
         }
         //let address = Address::new(0 as u32);
         //bus.write(address, 0xffff);
-        super::adc(&mut bus, Operant_Value::long(0xffff));
+        super::adc(&mut bus, OperantValue::Long(0xffff));
         let regs = bus.get_cpu().regs_ref().borrow();
         println!("C: {:X}", regs.C.get_C());
         assert_eq!(regs.C.get_C(), 0x0000);
@@ -357,7 +357,7 @@ mod tests {
         }
         //let address = Address::new(0 as u32);
         //bus.write(address, 0x0000);
-        super::adc(&mut bus, Operant_Value::long(0x0000));
+        super::adc(&mut bus, OperantValue::Long(0x0000));
         let regs = bus.get_cpu().regs_ref().borrow();
         println!("C: {:X}", regs.C.get_C());
         assert_eq!(regs.C.get_C(), 0x0000);
@@ -390,7 +390,7 @@ mod tests {
         }
         //let address = Address::new(0 as u32);
         //bus.write(address, 0xff);
-        super::adc(&mut bus, Operant_Value::long(0x0001));
+        super::adc(&mut bus, OperantValue::Long(0x0001));
         let regs = bus.get_cpu().regs_ref().borrow();
         println!("C: {:X}", regs.C.get_C());
         assert_eq!(regs.C.get_C(), 0x8001);
