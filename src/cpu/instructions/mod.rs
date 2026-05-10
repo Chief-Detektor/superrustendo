@@ -1,7 +1,6 @@
 use crate::cpu::addressmodes::AddressModes;
 use crate::cpu::decoder::Opcodes;
 use crate::mem::Bus;
-use std::borrow::BorrowMut;
 use std::num::Wrapping;
 
 use super::address::Address;

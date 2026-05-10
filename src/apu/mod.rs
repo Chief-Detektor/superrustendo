@@ -1,5 +1,5 @@
 use std::{
-    thread::{self, sleep},
+    thread::sleep,
     time::Duration,
 };
 

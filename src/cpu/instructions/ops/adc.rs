@@ -1,4 +1,4 @@
-use std::{num::Wrapping, usize, u16};
+use std::num::Wrapping;
 
 use crate::{
     cpu::{instructions::Operant_Value, Accumulator},

@@ -1,7 +1,5 @@
 use crate::mem::Bus;
 
-pub fn stp(bus: &mut Bus) {
-    let _cycles = 3;
-
+pub fn stp(_bus: &mut Bus) {
     // Do nothing basically
 }

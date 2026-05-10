@@ -6,15 +6,9 @@ use crate::{
 pub fn tsb(bus: &mut Bus, address: Address, address_mode: AddressModes) /* -> usize */
 {
     let mut regs = bus.get_cpu().regs.borrow_mut();
-    let mut cycles = 0;
     if regs.P.m == 1 {
         let mut val = bus.read(address) as u8;
         println!("val: {:#x}", val);
-        if address_mode == AddressModes::Absolute {
-            cycles = 6;
-        } else {
-            cycles = 5;
-        }
         println!("val: {:#b}", !(val as u8));
         val = val | regs.C.A as u8;
         println!("val: {:#b}", val);
@@ -27,17 +21,7 @@ pub fn tsb(bus: &mut Bus, address: Address, address_mode: AddressModes) /* -> us
         regs.P.z = (val == 0) as u8;
         bus.write(address, (val & 0x0f) as u8);
         bus.write(address.add(1), (val >> 8) as u8);
-        if address_mode == AddressModes::Absolute {
-            cycles = 6;
-            if (regs.D & 0x00ff) != 0 {
-                cycles += 1;
-            }
-        } else {
-            cycles = 5;
-        }
-        cycles += 2;
     }
-    //cycles
 }
 
 #[cfg(test)]

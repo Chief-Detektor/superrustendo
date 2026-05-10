@@ -48,16 +48,13 @@ impl Address {
             }
             _ => {
                 panic!("Invalid bank for rom access");
-                return *self;
             }
         }
     }
 
     fn mirror_hirom(&self) -> Address {
         match self.bank {
-            0x00..=0x1f => {
-                return *self;
-            }
+            0x00..=0x1f => *self,
             0x20..=0x3f => {
                 // Mirroring
                 return Address {
@@ -100,7 +97,6 @@ impl Address {
             }
             _ => {
                 panic!("Invalid bank for rom access");
-                return *self;
             }
         }
     }

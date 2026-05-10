@@ -143,7 +143,7 @@ fn get_operant_string(
             }
             let label_number = label_map.len().to_string();
             if *opcode == Opcodes::JSR {
-                &label_map.insert(
+                label_map.insert(
                     ((constant as i32) as u32).try_into().unwrap(),
                     "Label_".to_owned() + &label_number,
                 );
@@ -172,7 +172,7 @@ fn get_operant_string(
             }
             let label_number = label_map.len().to_string();
             if *opcode == Opcodes::JSR {
-                &label_map.insert(
+                label_map.insert(
                     ((constant as i32) as u32).try_into().unwrap(),
                     "Label_".to_owned() + &label_number,
                 );
@@ -201,7 +201,7 @@ fn get_operant_string(
             }
             let label_number = label_map.len().to_string();
             if *opcode == Opcodes::JSR {
-                &label_map.insert(
+                label_map.insert(
                     ((constant as i32) as u32).try_into().unwrap(),
                     "Label_".to_owned() + &label_number,
                 );
@@ -223,7 +223,7 @@ fn get_operant_string(
             }
             if *opcode == Opcodes::JSR {
                 let label_number = label_map.len().to_string();
-                &label_map.insert(
+                label_map.insert(
                     ((constant as i32) as u32).try_into().unwrap(),
                     "Label_".to_owned() + &label_number,
                 );
@@ -244,7 +244,7 @@ fn get_operant_string(
                 number = "0".to_owned() + &number;
             }
             let label_number = label_map.len().to_string();
-            &label_map.insert(
+            label_map.insert(
                 ((address as i32) as u32).try_into().unwrap(),
                 "Label_".to_owned() + &label_number,
             );
@@ -364,7 +364,7 @@ fn get_operant_string(
                 number = "0".to_owned() + &number;
             }
             let label_number = label_map.len().to_string();
-            &label_map.insert(
+            label_map.insert(
                 ((address as i32 + /*op_length as i32*/ 2 + constant as i32) as u32)
                     .try_into()
                     .unwrap(),
@@ -397,7 +397,7 @@ fn get_operant_string(
                 number = "0".to_owned() + &number;
             }
             let label_number = label_map.len().to_string();
-            &label_map.insert(
+            label_map.insert(
                 ((address as i32 + 2 + constant as i32) as u32)
                     .try_into()
                     .unwrap(),

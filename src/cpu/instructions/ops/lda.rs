@@ -1,7 +1,7 @@
 use crate::{cpu::{addressmodes::AddressModes, Accumulator, instructions::Operant_Value, address::Address}, mem::Bus};
 //
 //// TODO: unify Operant_Value and payload
-pub fn lda(bus: &mut Bus, effective_address: Option<Address>, address_mode: AddressModes, payload: &[u8], value: Option<Operant_Value>) {
+pub fn lda(bus: &mut Bus, _effective_address: Option<Address>, address_mode: AddressModes, payload: &[u8], value: Option<Operant_Value>) {
     let is_16_bit_mem_and_accu = bus.get_cpu().is_16_bit_mem_and_accu();
     let mut regs = bus.get_cpu().regs.borrow_mut();
     // if !is_16_bit_mem_and_accu(bus.get_cpu(). {
